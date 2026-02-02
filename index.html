@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>عباد الرحمن — دفتر الحسابات</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- ✅ PIN GATE -->
+  <div id="pinGate" class="gate">
+    <div class="gateCard">
+      <div class="gateBrand">
+        <div class="logo">ع</div>
+        <div>
+          <h2>عباد الرحمن</h2>
+          <p>ادخل رقم الـ PIN لفتح الدفتر</p>
+        </div>
+      </div>
+
+      <form id="pinForm" class="gateForm">
+        <label class="lbl">PIN</label>
+        <input id="pinInput" type="password" inputmode="numeric" autocomplete="one-time-code"
+               placeholder="ادخل PIN هنا" maxlength="8" />
+        <div class="help">التعليمات: اكتب الرقم السري ثم اضغط “دخول”.</div>
+
+        <button class="btn primary" type="submit">دخول</button>
+        <div id="pinError" class="error" hidden>PIN غير صحيح.</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ✅ APP -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">ع</div>
+      <div>
+        <h1>عباد الرحمن</h1>
+        <p>مصاريف • سلف • آجل • موردين • مدفوعات منفصلة</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnExport" class="btn ghost" type="button">تصدير نسخة</button>
+      <label class="btn ghost file">
+        استيراد نسخة
+        <input id="fileImport" type="file" accept="application/json" hidden />
+      </label>
+      <button id="btnPrint" class="btn ghost" type="button">طباعة</button>
+    </div>
+  </header>
+
+  <main class="container" id="appRoot" hidden>
+    <section class="grid">
+      <div class="card">
+        <h2>ملخص سريع</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <span class="label">إجمالي المصروفات (إجمالي العمليات نوع مصروف)</span>
+            <span id="kpiExpenses" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي المدفوعات</span>
+            <span id="kpiPaid" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي المستحق (باقي)</span>
+            <span id="kpiRemaining" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">عدد العمليات</span>
+            <span id="kpiCount" class="value">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>إضافة عملية جديدة</h2>
+
+        <form id="entryForm" class="form">
+          <div class="row">
+            <div class="field">
+              <label>التاريخ</label>
+              <input id="date" type="date" />
+              <div class="help">التعليمات: اختار تاريخ العملية (مثال: 2026-02-03).</div>
+            </div>
+
+            <div class="field">
+              <label>النوع</label>
+              <select id="type">
+                <option value="" selected>— اختر —</option>
+                <option value="expense">مصروف</option>
+                <option value="advance">سُلفة</option>
+                <option value="credit_customer">آجل (عميل)</option>
+                <option value="credit_supplier">فاتورة/مورد (تاجر)</option>
+              </select>
+              <div class="help">التعليمات: اختر نوع العملية لتظهر في التقارير بشكل صحيح.</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label>الاسم / الجهة</label>
+              <input id="party" type="text" placeholder="مثال: أحمد / عميل محمد / مورد الشروق" />
+              <div class="help">التعليمات: اكتب اسم الشخص أو الجهة (عميل/مورد/موظف…).</div>
+            </div>
+
+            <div class="field">
+              <label>وصف العملية</label>
+              <input id="desc" type="text" placeholder="مثال: إيجار فبراير / بضاعة آجلة / سلفة عامل" />
+              <div class="help">التعليمات: وصف مختصر يسهل عليك البحث بعدين.</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label>الإجمالي (جنيه)</label>
+              <input id="total" type="number" min="0" step="0.01" placeholder="مثال: 1500" />
+              <div class="help">التعليمات: اكتب إجمالي المبلغ (بدون وضع 0).</div>
+            </div>
+
+            <div class="field">
+              <label>دفعة أولى (اختياري)</label>
+              <input id="firstPay" type="number" min="0" step="0.01" placeholder="مثال: 300" />
+              <div class="help">التعليمات: لو تم دفع جزء الآن، اكتب المبلغ. لو لا، سيبها فاضية.</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label>تصنيف (للمصاريف فقط)</label>
+              <select id="category">
+                <option value="" selected>—</option>
+                <option>مرتبات</option>
+                <option>إيجار</option>
+                <option>كهرباء</option>
+                <option>مياه</option>
+                <option>إنترنت</option>
+                <option>نثريات</option>
+                <option>صيانة</option>
+                <option>نقل</option>
+                <option>أخرى</option>
+              </select>
+              <div class="help">التعليمات: لو النوع “مصروف” اختار تصنيف، غير كده سيبه —.</div>
+            </div>
+
+            <div class="field">
+              <label>ملاحظات (اختياري)</label>
+              <input id="notes" type="text" placeholder="أي تفاصيل إضافية" />
+              <div class="help">التعليمات: اكتب أي ملاحظة (مثال: تم الاتفاق على الدفع أسبوعيًا).</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <button class="btn primary" type="submit">حفظ العملية</button>
+            <button id="btnReset" class="btn" type="button">مسح الحقول</button>
+          </div>
+
+          <p class="hint">
+            ملحوظة: المدفوعات بتتسجل في “سجل المدفوعات” منفصل. (المتبقي = الإجمالي - مجموع المدفوعات).
+          </p>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2>السجل</h2>
+        <div class="filters">
+          <input id="q" type="search" placeholder="بحث بالاسم / الوصف / الملاحظات..." />
+          <select id="filterType">
+            <option value="">كل الأنواع</option>
+            <option value="expense">مصروف</option>
+            <option value="advance">سُلفة</option>
+            <option value="credit_customer">آجل (عميل)</option>
+            <option value="credit_supplier">فاتورة/مورد</option>
+          </select>
+          <select id="filterOpen">
+            <option value="">الكل</option>
+            <option value="open">عليه باقي فقط</option>
+            <option value="closed">مقفول (مدفوع بالكامل)</option>
+          </select>
+          <button id="btnClearAll" class="btn danger" type="button">حذف كل البيانات</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>التاريخ</th>
+              <th>النوع</th>
+              <th>الاسم/الجهة</th>
+              <th>الوصف</th>
+              <th>تصنيف</th>
+              <th class="num">إجمالي (ج.م)</th>
+              <th class="num">مدفوع (ج.م)</th>
+              <th class="num">باقي (ج.م)</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2>سجل المدفوعات</h2>
+        <div class="filters">
+          <input id="payQ" type="search" placeholder="بحث في المدفوعات بالاسم/ملاحظة..." />
+          <button id="btnPaymentsExport" class="btn ghost" type="button">تصدير المدفوعات فقط</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>تاريخ الدفع</th>
+              <th>الاسم/الجهة</th>
+              <th>تابع لعملية</th>
+              <th class="num">المبلغ (ج.م)</th>
+              <th>ملاحظة</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="payTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>كشف حساب لاسم محدد</h2>
+      <div class="ledger">
+        <input id="ledgerName" type="text" placeholder="اكتب الاسم (بالظبط زي ما بتكتبه في العمليات)" />
+        <button id="btnLedger" class="btn" type="button">عرض</button>
+        <div id="ledgerBox" class="ledgerBox"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© عباد الرحمن — دفتر الحسابات (بيانات محلية على الجهاز)</span>
+  </footer>
+
+  <!-- ✅ Modal: Add Payment -->
+  <div id="payModal" class="modal" hidden>
+    <div class="modalCard">
+      <div class="modalHead">
+        <h3>إضافة دفعة</h3>
+        <button id="payClose" class="btn small" type="button">إغلاق</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="field">
+          <label>تاريخ الدفع</label>
+          <input id="payDate" type="date" />
+          <div class="help">التعليمات: اختار تاريخ الدفعة.</div>
+        </div>
+
+        <div class="field">
+          <label>المبلغ (جنيه)</label>
+          <input id="payAmount" type="number" min="0" step="0.01" placeholder="مثال: 200" />
+          <div class="help">التعليمات: اكتب قيمة الدفعة (سيبها فاضية لو مش هتضيف).</div>
+        </div>
+
+        <div class="field">
+          <label>ملاحظة (اختياري)</label>
+          <input id="payNote" type="text" placeholder="مثال: دفعة أولى / تحويل فودافون كاش" />
+          <div class="help">التعليمات: أي توضيح لطريقة الدفع أو سبب الدفعة.</div>
+        </div>
+
+        <button id="paySave" class="btn primary" type="button">حفظ الدفعة</button>
+        <div id="payError" class="error" hidden>من فضلك املأ تاريخ الدفع والمبلغ.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
