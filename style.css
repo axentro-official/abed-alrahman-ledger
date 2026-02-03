@@ -419,6 +419,45 @@ input::placeholder{color: rgba(169,183,208,.7)}
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
 
+/* =========================================================
+   ✅ FIX 1: منع وميض PIN Gate بعد Refresh (اعتمادًا على html.authed)
+   ========================================================= */
+html.authed #pinGate{
+  display:none !important;
+}
+
+/* =========================================================
+   ✅ FIX 2: Print Footer ثابت (نص + QR) — يظهر في PDF دائمًا
+   ========================================================= */
+.printFooter{
+  margin-top:14px;
+  padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.12);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.printFooter .pfText{
+  font-size:12px;
+  opacity:.88;
+  line-height:1.4;
+}
+.printFooter .pfText .muted{
+  opacity:.75;
+  font-weight:700;
+}
+.printFooter img{
+  width:110px;
+  max-width:40vw;
+  height:auto;
+  display:inline-block;
+  border-radius:14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  padding: 10px;
+}
 
 /* =========================================================
    ✅ Preview / Print Styles
@@ -517,6 +556,12 @@ input::placeholder{color: rgba(169,183,208,.7)}
   @page{
     size: A4;
     margin: 12mm;
+  }
+
+  /* ✅ تحسين طباعة الألوان */
+  *{
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   html, body{
@@ -626,7 +671,28 @@ input::placeholder{color: rgba(169,183,208,.7)}
     display:block !important;
   }
 
-  /* ✅ NEW: QR في الطباعة (واضح + بدون خلفية غامقة) */
+  /* ✅ Print footer (اللي هنضيفه في HTML) */
+  .printFooter{
+    display:flex !important;
+    border-top:1px dashed #e5e7eb !important;
+    margin-top:10mm !important;
+    padding-top:6mm !important;
+  }
+  .printFooter .pfText{
+    color:#0f172a !important;
+    opacity:1 !important;
+    font-size:10pt !important;
+  }
+  .printFooter img{
+    width:38mm !important;
+    max-width:55mm !important;
+    padding:4mm !important;
+    border:1px solid #e5e7eb !important;
+    background:#fff !important;
+    border-radius:6mm !important;
+  }
+
+  /* ✅ QR Footer القديم (لو موجود) */
   .qrFooter{
     display:block !important;
     text-align:center !important;
@@ -635,7 +701,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
     border-top: 1px dashed #e5e7eb !important;
   }
   .qrFooter img{
-    width: 38mm !important;         /* مقاس مناسب للطباعة */
+    width: 38mm !important;
     max-width: 55mm !important;
     padding: 4mm !important;
     border: 1px solid #e5e7eb !important;
