@@ -5,16 +5,10 @@
    ✅ حذف بــ PIN + سجل محذوفات (Trash)
    ✅ كشف حساب + معاينات + طباعة/PDF
    ✅ تقارير Reports + اتجاه المدفوعات (out/in)
-   ✅ FIXES (نهائي):
-      1) الدفعات الجزئية بتأثر على الباقي في كشف الحساب والسجل والتقارير بشكل صحيح:
-         - فلوس ليا (receivable): الدفعات الداخلة in تقلل الباقي
-         - فلوس عليا (payable): الدفعات الخارجة out تقلل الباقي
-      2) PDF: الفوتر + QR يظهروا دائمًا (حتى عند طباعة/بحث شخص واحد)
-      3) تفعيل Ledger Preview (كان زر موجود بدون منطق)
-      4) التخزين أصبح Google Sheet عبر Apps Script Web App (مع fallback للـ localStorage لو حصل مشكلة)
-      5) ✅ NEW: منع Pop-up alert الخاص بتحميل البيانات (بداله Banner داخل الصفحة)
-      6) ✅ NEW: ربط auth بـ html.authed لمنع وميض الدخول بعد Refresh
-      7) ✅ NEW: منع تكرار QR بعد إضافة printFooter في index.html
+
+   ✅ FIX (نهائي):
+   - حل CORS على اللاب: apiCall = GET فقط (بدون preflight)
+   - تسريع: البحث/الفلاتر لا تعيد تحميل الشيت — فقط Render من الكاش
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -49,10 +43,10 @@ function typeLabel(t){
 
 /* ✅ تصنيف مالي */
 function moneySide(entryType){
-  if(entryType === "expense") return "expense";            // مصروف
-  if(entryType === "credit_supplier") return "payable";    // فلوس عليا
-  if(entryType === "credit_customer") return "receivable"; // فلوس ليا
-  if(entryType === "advance") return "receivable";         // سُلفة (فلوس ليا)
+  if(entryType === "expense") return "expense";
+  if(entryType === "credit_supplier") return "payable";
+  if(entryType === "credit_customer") return "receivable";
+  if(entryType === "advance") return "receivable";
   return "other";
 }
 function sideLabel(side){
@@ -100,7 +94,6 @@ function ensureGlobalBanner(){
   box.style.maxWidth = "900px";
   box.style.margin = "0 auto";
 
-  // نفس شكل .error عندك + زر
   box.innerHTML = `
     <div class="error" style="display:flex; gap:10px; align-items:flex-start; justify-content:space-between;">
       <div style="flex:1">
@@ -121,10 +114,8 @@ function ensureGlobalBanner(){
   btnRetry?.addEventListener("click", async ()=>{
     hideGlobalError();
     if(isAuthed()){
-      try{
-        await STORE.init();
-      }catch(_e){}
-      await refresh();
+      try{ await STORE.init(); }catch(_e){}
+      await refresh(true);
     }
   });
 }
@@ -136,7 +127,6 @@ function showGlobalError(msg){
   if(t) t.textContent = msg || "حدث خطأ غير متوقع.";
   if(banner) banner.hidden = false;
 }
-
 function hideGlobalError(){
   const banner = document.getElementById("globalBanner");
   if(banner) banner.hidden = true;
@@ -168,7 +158,6 @@ function showPage(name){
 
 /* -------------------- Auth -------------------- */
 function setAuthed(v){
-  // ✅ sessionStorage + ✅ html class (منع الوميض)
   if(v){
     sessionStorage.setItem(AUTH_KEY, "1");
     document.documentElement.classList.add("authed");
@@ -194,7 +183,6 @@ function openApp(){
   if(nav) nav.hidden = false;
 
   showPage("dashboard");
-  refresh();
 }
 
 function closeApp(){
@@ -245,7 +233,6 @@ function setupPinGate(){
         pinInput.value = "";
         pinInput.type = "password";
 
-        // ✅ افتح التطبيق فورًا لتفادي الوميض ثم جهز/حمّل
         openApp();
 
         try{
@@ -255,7 +242,7 @@ function setupPinGate(){
           showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
         }
 
-        await refresh();
+        await refresh(true);
 
       } else {
         if(pinError) pinError.hidden = false;
@@ -271,7 +258,6 @@ function requirePin(actionText = "تنفيذ العملية"){
   const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
   if(v === null) return false;
   if((v || "").trim() !== PIN_CODE){
-    // نتركها alert هنا لأنها إجراء حساس ومقصود
     alert("PIN غير صحيح.");
     return false;
   }
@@ -315,7 +301,6 @@ function getEntryFromForm(){
     }
   }
 
-  // ✅ ممنوع دفعة أولى للمصروف
   if(entry.type === "expense"){
     firstPay = null;
     if(el("firstPay")) el("firstPay").value = "";
@@ -365,31 +350,25 @@ const API_ACTIONS = {
   deleteTrashLog: "deleteTrashLog"
 };
 
+/* ✅✅✅ FIX CORS: GET ONLY (بدون preflight) */
 async function apiCall(action, payload = {}){
   if(!API_CFG?.scriptUrl) throw new Error("NO_SCRIPT_URL");
 
   const url = API_CFG.scriptUrl;
   const pin = String(API_CFG.pin || PIN_CODE);
 
-  try{
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({ action, pin, ...payload })
-    });
-    const j = await r.json();
-    if(!j || j.ok === false) throw new Error(j?.error || "API_ERROR");
-    return j;
-  }catch(_e){
-    const qs = new URLSearchParams();
-    qs.set("action", action);
-    qs.set("pin", pin);
-    qs.set("payload", JSON.stringify(payload));
-    const r2 = await fetch(`${url}?${qs.toString()}`, { method:"GET" });
-    const j2 = await r2.json();
-    if(!j2 || j2.ok === false) throw new Error(j2?.error || "API_ERROR");
-    return j2;
-  }
+  const qs = new URLSearchParams();
+  qs.set("action", action);
+  qs.set("pin", pin);
+  qs.set("payload", JSON.stringify(payload));
+  qs.set("_ts", String(Date.now())); // cache-buster
+
+  const full = `${url}?${qs.toString()}`;
+
+  const r = await fetch(full, { method:"GET", mode:"cors" });
+  const j = await r.json();
+  if(!j || j.ok === false) throw new Error(j?.error || "API_ERROR");
+  return j;
 }
 
 class LocalStore {
@@ -484,7 +463,6 @@ class SheetsStore {
   async deleteTrashLog(logId){ await apiCall(API_ACTIONS.deleteTrashLog, { logId }); }
 }
 
-/* ✅ Hybrid: Sheets + fallback Local */
 class HybridStore {
   constructor(){
     this.local = new LocalStore();
@@ -515,7 +493,6 @@ class HybridStore {
     try{
       const all = await this.sheets.getAll();
 
-      // ✅ cache locally
       const payments = (all.payments || []).map(p => ({
         ...p,
         flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
@@ -526,7 +503,6 @@ class HybridStore {
     }catch(e){
       console.error(e);
       this.mode = "local";
-      // fallback local
       return await this.local.getAll();
     }
   }
@@ -537,7 +513,7 @@ class HybridStore {
     }
     try{
       await this.sheets.addEntry(entry);
-      await this.local.addEntry(entry); // cache
+      await this.local.addEntry(entry);
     }catch(e){
       console.error(e);
       this.mode = "local";
@@ -621,7 +597,21 @@ const STATE = {
   trash: []
 };
 
-/* -------------------- Render KPIs (Dashboard) -------------------- */
+/* -------------------- Render (من الكاش فقط) ✅ سرعة -------------------- */
+function renderFromState(){
+  const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
+  renderKPIs(entriesView, STATE.payments);
+  renderEntriesTable(applyEntryFilters(entriesView));
+  renderPaymentsTable(STATE.payments, STATE.entries);
+
+  const trashPage = document.getElementById("page-trash");
+  if(trashPage && !trashPage.hidden) renderTrash();
+
+  const reportsPage = document.getElementById("page-reports");
+  if(reportsPage && !reportsPage.hidden) renderReports();
+}
+
+/* -------------------- Render KPIs -------------------- */
 function computeTotals(entriesView, payments){
   const expensesTotal = entriesView
     .filter(e => e.type === "expense")
@@ -629,10 +619,6 @@ function computeTotals(entriesView, payments){
 
   const paidOutTotal = payments
     .filter(p => (p.flow || "out") === "out")
-    .reduce((a,p)=> a + Number(p.amount || 0), 0);
-
-  const paidInTotal = payments
-    .filter(p => (p.flow || "out") === "in")
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
 
   const remainingReceivable = entriesView
@@ -643,7 +629,7 @@ function computeTotals(entriesView, payments){
     .filter(e => e.side === "payable")
     .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
-  return { expensesTotal, paidOutTotal, paidInTotal, remainingReceivable, remainingPayable };
+  return { expensesTotal, paidOutTotal, remainingReceivable, remainingPayable };
 }
 
 function renderKPIs(entriesView, payments){
@@ -651,10 +637,8 @@ function renderKPIs(entriesView, payments){
 
   el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(t.expensesTotal));
   el("kpiPaid") && (el("kpiPaid").textContent = fmt(t.paidOutTotal));
-
   el("kpiReceivable") && (el("kpiReceivable").textContent = fmt(t.remainingReceivable));
   el("kpiPayable") && (el("kpiPayable").textContent = fmt(t.remainingPayable));
-
   el("kpiCount") && (el("kpiCount").textContent = entriesView.length.toLocaleString("ar-EG"));
 }
 
@@ -816,18 +800,11 @@ function closePayModal(){
   CURRENT_PAY_ENTRY_ID = null;
 }
 
-/* -------------------- ✅ Print Footer (منع التكرار) -------------------- */
-/*
-  - لو index.html فيه .printFooter => نعتمد عليه فقط
-  - ممنوع حقن QR داخل الكروت حتى لا يتكرر
-*/
+/* -------------------- Print Footer -------------------- */
 function cleanupLegacyInjectedFooters(){
   document.querySelectorAll(".__printFooterInjected").forEach(n => n.remove());
 }
-
-// لو حد لسه بينادي preparePrintForCurrentPage من مكان تاني: نخليه آمن
 function preparePrintForCurrentPage(){
-  // ✅ فقط تنظيف أي footers قديمة
   cleanupLegacyInjectedFooters();
 }
 window.addEventListener("beforeprint", preparePrintForCurrentPage);
@@ -923,7 +900,7 @@ function showLedger(name){
   const entries = entriesAll
     .filter(e => (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
@@ -948,7 +925,7 @@ function showLedger(name){
 
   const paidLabel = (mode === "customer") ? "المدفوع (داخلة)" :
                     (mode === "supplier") ? "المدفوع (خارجة)" :
-                    "المدفوع (حسب النوع)";
+                    "المدفوع";
 
   box.innerHTML += `
     <div class="line"><b>الإجمالي${headerMode}</b><b>${fmt(total)}</b></div>
@@ -1011,7 +988,7 @@ function openPersonDetails(name, side = "all"){
   }
 }
 
-/* -------------------- ✅ Ledger Preview (تم تفعيله) -------------------- */
+/* -------------------- Ledger Preview -------------------- */
 function openLedgerPreview(){
   const q = (el("ledgerName")?.value || "").trim();
   if(!q){
@@ -1033,7 +1010,7 @@ function openLedgerPreview(){
   const pays = paysAll
     .filter(p => (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(p => allowedEntryIds.has(p.entryId))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt)); // ✅ FIX
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
   const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
   const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
@@ -1159,7 +1136,7 @@ function renderTrash(){
   }
 }
 
-/* -------------------- Reports -------------------- */
+/* -------------------- Reports (كما هو عندك) -------------------- */
 function toDateNum(iso){
   if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
   return Number(iso.replaceAll("-", ""));
@@ -1192,7 +1169,6 @@ function presetRange(preset){
   }
   return null;
 }
-
 function filterEntriesByReportType(entriesView, repType){
   if(repType === "all") return entriesView;
   if(repType === "payments_out" || repType === "receipts_in") return [];
@@ -1299,7 +1275,7 @@ function renderReports(){
   if(repPaysTbody){
     repPaysTbody.innerHTML = "";
     const sortedPays = [...pays].sort((a,b)=>
-      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - b.createdAt)
     );
 
     if(sortedPays.length === 0){
@@ -1319,16 +1295,25 @@ function renderReports(){
   }
 }
 
-/* -------------------- Refresh -------------------- */
+/* -------------------- Refresh (تحميل من الشيت) -------------------- */
 let __refreshLock = false;
-
-async function refresh(){
+async function refresh(forceNetwork = false){
   if(__refreshLock) return;
   __refreshLock = true;
 
   try{
     hideGlobalError();
 
+    // ✅ عرض فوري من الكاش المحلي (لو موجود) — بيريح المستخدم
+    if(!forceNetwork){
+      const local = await STORE.local.getAll();
+      STATE.entries = Array.isArray(local.entries) ? local.entries : [];
+      STATE.payments = Array.isArray(local.payments) ? local.payments : [];
+      STATE.trash = Array.isArray(local.trash) ? local.trash : [];
+      renderFromState();
+    }
+
+    // ✅ بعدها نجيب من الشيت (مرة واحدة)
     const all = await STORE.getAll();
 
     const payments = (all.payments || []).map(p => ({
@@ -1340,31 +1325,15 @@ async function refresh(){
     STATE.payments = payments;
     STATE.trash = Array.isArray(all.trash) ? all.trash : [];
 
-    const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
-
-    renderKPIs(entriesView, STATE.payments);
-    renderEntriesTable(applyEntryFilters(entriesView));
-    renderPaymentsTable(STATE.payments, STATE.entries);
-
-    const trashPage = document.getElementById("page-trash");
-    if(trashPage && !trashPage.hidden) renderTrash();
-
-    const reportsPage = document.getElementById("page-reports");
-    if(reportsPage && !reportsPage.hidden) renderReports();
-
-    // ✅ لو كان في مشكلة قديمة انتهت: نخفي البانر
+    renderFromState();
     hideGlobalError();
 
   }catch(e){
     console.error(e);
-
-    // ✅ بدل Pop-up alert
-    // نفصل رسالة واضحة حسب الوضع
     const msg =
       (STORE.mode === "local")
         ? "تعذر تحميل البيانات من الشيت. جاري استخدام التخزين المحلي مؤقتًا."
         : "حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اضغط إعادة المحاولة.";
-
     showGlobalError(msg);
   }finally{
     __refreshLock = false;
@@ -1377,53 +1346,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     ensureGlobalBanner();
     setupPinGate();
 
-    // ✅ مزامنة class لو المستخدم authed
     if(isAuthed()){
       document.documentElement.classList.add("authed");
-
-      // افتح التطبيق فورًا لتجنب الوميض
       openApp();
 
-      // ثم حاول init/refresh
-      try{
-        await STORE.init();
-      }catch(e){
+      try{ await STORE.init(); }
+      catch(e){
         console.error(e);
         showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
       }
 
-      await refresh();
+      await refresh(true);
     }
 
     document.querySelectorAll(".navBtn").forEach(btn=>{
       btn.addEventListener("click", ()=> showPage(btn.dataset.page));
     });
 
-    const logoutBtn = el("btnLogout");
-    if(logoutBtn){
-      logoutBtn.addEventListener("click", ()=>{
-        if(confirm("هل تريد تسجيل الخروج؟")){
-          setAuthed(false);
-          closeApp();
-        }
-      });
-    }
-
-    const btnPrint = el("btnPrint");
-    if(btnPrint){
-      btnPrint.addEventListener("click", ()=>{
-        preparePrintForCurrentPage();
-        window.print();
-      });
-    }
-
-    el("firstPay")?.addEventListener("input", ()=>{
-      const v = el("firstPay").value;
-      if(v !== "" && Number(v) <= 0) el("firstPay").value = "";
-      if(el("type")?.value === "expense") el("firstPay").value = "";
+    el("btnLogout")?.addEventListener("click", ()=>{
+      if(confirm("هل تريد تسجيل الخروج؟")){
+        setAuthed(false);
+        closeApp();
+      }
     });
-    el("type")?.addEventListener("change", ()=>{
-      if(el("type").value === "expense" && el("firstPay")) el("firstPay").value = "";
+
+    el("btnPrint")?.addEventListener("click", ()=>{
+      preparePrintForCurrentPage();
+      window.print();
     });
 
     // ✅ Add Entry
@@ -1433,16 +1382,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const { entry, firstPay } = getEntryFromForm();
       const err = validateEntry(entry);
-      if(err){
-        alert(err);
-        return;
-      }
+      if(err){ alert(err); return; }
 
-      if(firstPay !== null){
-        if(firstPay > entry.total){
-          alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
-          return;
-        }
+      if(firstPay !== null && firstPay > entry.total){
+        alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
+        return;
       }
 
       try{
@@ -1465,30 +1409,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         resetForm();
-        await refresh();
+        await refresh(true);
 
       }catch(e){
         console.error(e);
         showGlobalError("تعذر حفظ العملية على الشيت. تم الحفظ محليًا إذا كان الوضع Offline.");
+        renderFromState();
       }
     });
 
     el("btnReset")?.addEventListener("click", resetForm);
 
+    // ✅✅✅ سرعة: الفلاتر تعمل render فقط (لا تعمل refresh للشيت)
     ["q","filterType","filterOpen"].forEach(id=>{
-      el(id)?.addEventListener("input", refresh);
-      el(id)?.addEventListener("change", refresh);
+      el(id)?.addEventListener("input", renderFromState);
+      el(id)?.addEventListener("change", renderFromState);
     });
+    el("payQ")?.addEventListener("input", renderFromState);
+    el("trashQ")?.addEventListener("input", renderFromState);
 
-    el("payQ")?.addEventListener("input", refresh);
-    el("trashQ")?.addEventListener("input", refresh);
-
-    // ✅ Reports events
+    // Reports
     el("btnRunReports")?.addEventListener("click", renderReports);
-    el("btnPrintReports")?.addEventListener("click", ()=>{
-      preparePrintForCurrentPage();
-      window.print();
-    });
+    el("btnPrintReports")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
     el("repRangePreset")?.addEventListener("change", renderReports);
     el("repFrom")?.addEventListener("change", renderReports);
     el("repTo")?.addEventListener("change", renderReports);
@@ -1498,7 +1440,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ledgerTimer = setTimeout(renderReports, 250);
     });
 
-    // ✅ Table actions
+    // Table actions
     el("tbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
@@ -1513,16 +1455,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           const pays = STATE.payments.filter(p => p.entryId === id);
 
           try{
-            await STORE.deleteEntry(id, {
-              entrySnapshot: entry,
-              paymentsSnapshot: pays
-            });
+            await STORE.deleteEntry(id, { entrySnapshot: entry, paymentsSnapshot: pays });
           }catch(e){
             console.error(e);
             showGlobalError("تعذر الحذف على الشيت. تم تنفيذ الحذف محليًا إذا كان الوضع Offline.");
           }
 
-          await refresh();
+          await refresh(true);
         }
         return;
       }
@@ -1534,33 +1473,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         const name = btn.dataset.name || "";
         const side = btn.dataset.side || "all";
         openPersonDetails(name, side);
-        return;
       }
     });
 
-    // ✅ Preview buttons
-    el("btnBackFromEntryPreview")?.addEventListener("click", ()=> showPage("records"));
-    el("btnPrintEntry")?.addEventListener("click", ()=>{
-      preparePrintForCurrentPage();
-      window.print();
+    // Ledger
+    el("btnLedger")?.addEventListener("click", ()=> showLedger(el("ledgerName")?.value || ""));
+    el("ledgerMode")?.addEventListener("change", ()=> showLedger(el("ledgerName")?.value || ""));
+    el("ledgerName")?.addEventListener("input", ()=>{
+      clearTimeout(ledgerTimer);
+      ledgerTimer = setTimeout(()=> showLedger(el("ledgerName").value), 250);
     });
-
-    el("btnBackFromLedgerPreview")?.addEventListener("click", ()=> showPage("ledger"));
-    el("btnPrintLedger")?.addEventListener("click", ()=>{
-      preparePrintForCurrentPage();
-      window.print();
-    });
-
-    // ✅ Ledger Preview button
     el("btnLedgerPreview")?.addEventListener("click", openLedgerPreview);
 
-    // ✅ Payment modal
+    // Payment modal
     el("payClose")?.addEventListener("click", closePayModal);
-    el("payModal")?.addEventListener("click", (ev)=>{
-      if(ev.target === el("payModal")) closePayModal();
-    });
+    el("payModal")?.addEventListener("click", (ev)=>{ if(ev.target === el("payModal")) closePayModal(); });
 
-    // ✅ Save payment
     el("paySave")?.addEventListener("click", async ()=>{
       const entry = STATE.entries.find(e => e.id === CURRENT_PAY_ENTRY_ID);
       if(!entry) return closePayModal();
@@ -1608,10 +1536,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       closePayModal();
-      await refresh();
+      await refresh(true);
     });
 
-    // ✅ Delete payment (PIN)
+    // Delete payment
     el("payTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
@@ -1622,20 +1550,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if(confirm("متأكد حذف الدفعة؟")){
         const pay = STATE.payments.find(p => p.id === payId) || null;
 
-        try{
-          await STORE.deletePayment(payId, {
-            paymentSnapshot: pay
-          });
-        }catch(e){
+        try{ await STORE.deletePayment(payId, { paymentSnapshot: pay }); }
+        catch(e){
           console.error(e);
           showGlobalError("تعذر حذف الدفعة على الشيت. تم تنفيذ الحذف محليًا إذا كان الوضع Offline.");
         }
 
-        await refresh();
+        await refresh(true);
       }
     });
 
-    // ✅ Trash: delete forever per row (PIN)
+    // Trash delete forever
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
@@ -1655,23 +1580,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    // ✅ Ledger live search
-    el("ledgerName")?.addEventListener("input", ()=>{
-      clearTimeout(ledgerTimer);
-      ledgerTimer = setTimeout(()=>{
-        showLedger(el("ledgerName").value);
-      }, 250);
-    });
-
-    el("btnLedger")?.addEventListener("click", ()=> showLedger(el("ledgerName").value));
-
-    el("ledgerMode")?.addEventListener("change", ()=>{
-      showLedger(el("ledgerName")?.value || "");
-    });
-
   }catch(e){
     console.error(e);
-    // بدل alert عام:
     showGlobalError("فيه خطأ حصل في تشغيل الصفحة. جرّب تحديث الصفحة أو امسح كاش الموقع.");
   }
 });
