@@ -39,10 +39,10 @@
           </form>
         </div>
 
-        <!-- ✅ Footer داخل اللوجين -->
+        <!-- ✅ Footer داخل اللوجين (رجعناه زي ما كان) -->
         <div class="gateFooter">
-          <div>© سوبر ماركت أولاد يحيى — All Rights Reserved 2026</div>
-          <div class="gateFooterMuted">إدارة هيثم</div>
+          <div>© Axentro — All Rights Reserved 2024</div>
+          <div class="gateFooterMuted">By Ahmed Hamouda</div>
         </div>
       </div>
     </div>
@@ -53,28 +53,28 @@
     <div class="brand">
       <div class="logo">أ</div>
       <div>
-        <h1>سوبر ماركت أولاد يحيى</h1>
-        <p>إدارة هيثم • مصاريف • سلف • آجل • موردين • مدفوعات منفصلة</p>
+        <h1>
+          سوبر ماركت أولاد يحيى
+          <span class="adminTag">إدارة هيثم</span>
+        </h1>
+        <p>مصاريف • سلف • آجل • موردين • مدفوعات منفصلة</p>
       </div>
     </div>
 
+    <!-- ✅ الهيدر: زر طباعة + تسجيل خروج فقط -->
     <div class="actions">
-      <button id="btnExport" class="btn ghost" type="button">تصدير نسخة</button>
-      <label class="btn ghost file">
-        استيراد نسخة
-        <input id="fileImport" type="file" accept="application/json" hidden />
-      </label>
       <button id="btnPrint" class="btn ghost" type="button">طباعة</button>
       <button id="btnLogout" class="btn danger" type="button">تسجيل خروج</button>
     </div>
   </header>
 
-  <!-- ✅ NAV -->
+  <!-- ✅ NAV (Tabs) -->
   <nav class="navBar" id="navBar" hidden>
-    <button class="navBtn active" data-page="dashboard">🏠 داش بورد</button>
+    <button class="navBtn active" data-page="dashboard">🏠 الرئيسية</button>
     <button class="navBtn" data-page="records">📒 السجل</button>
     <button class="navBtn" data-page="payments">💳 المدفوعات</button>
     <button class="navBtn" data-page="ledger">📊 كشف حساب</button>
+    <button class="navBtn" data-page="trash">🗑️ المحذوفات</button>
   </nav>
 
   <main class="container" id="appRoot" hidden>
@@ -198,7 +198,6 @@
     <section id="page-records" class="page" hidden>
       <div class="pageHead">
         <h2>السجل</h2>
-        <button class="btn" type="button" data-go="dashboard">⬅ رجوع للداش بورد</button>
       </div>
 
       <div class="card">
@@ -217,7 +216,7 @@
               <option value="open">عليه باقي فقط</option>
               <option value="closed">مقفول (مدفوع بالكامل)</option>
             </select>
-            <button id="btnClearAll" class="btn danger" type="button">حذف كل البيانات</button>
+            <!-- ❌ حذفنا زر حذف كل البيانات -->
           </div>
         </div>
 
@@ -246,14 +245,13 @@
     <section id="page-payments" class="page" hidden>
       <div class="pageHead">
         <h2>سجل المدفوعات</h2>
-        <button class="btn" type="button" data-go="dashboard">⬅ رجوع للداش بورد</button>
       </div>
 
       <div class="card">
         <div class="toolbar">
           <div class="filters">
             <input id="payQ" type="search" placeholder="بحث في المدفوعات بالاسم/ملاحظة..." />
-            <button id="btnPaymentsExport" class="btn ghost" type="button">تصدير المدفوعات فقط</button>
+            <!-- (لو حبيت نشيل أي تصدير هنا كمان قولّي) -->
           </div>
         </div>
 
@@ -279,24 +277,57 @@
     <section id="page-ledger" class="page" hidden>
       <div class="pageHead">
         <h2>كشف حساب</h2>
-        <button class="btn" type="button" data-go="dashboard">⬅ رجوع للداش بورد</button>
       </div>
 
       <div class="card">
         <div class="ledger">
-          <input id="ledgerName" type="text" placeholder="اكتب الاسم (بالظبط زي ما بتكتبه في العمليات)" />
+          <input id="ledgerName" type="text" placeholder="اكتب الاسم (جزء من الاسم يكفي)..." />
           <button id="btnLedger" class="btn" type="button">عرض</button>
           <div id="ledgerBox" class="ledgerBox"></div>
         </div>
       </div>
     </section>
 
+    <!-- ✅ PAGE: TRASH (Deleted Log) -->
+    <section id="page-trash" class="page" hidden>
+      <div class="pageHead">
+        <h2>سجل المحذوفات</h2>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="filters">
+            <input id="trashQ" type="search" placeholder="بحث في المحذوفات بالاسم/الوصف..." />
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>وقت الحذف</th>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الاسم/الجهة</th>
+                <th>الوصف</th>
+                <th class="num">الإجمالي</th>
+                <th class="num">مدفوع</th>
+                <th class="num">باقي</th>
+                <th>سبب</th>
+              </tr>
+            </thead>
+            <tbody id="trashTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <!-- ✅ Footer -->
+  <!-- ✅ Footer (رجعناه زي ما كان) -->
   <footer class="footer2">
-    <div>© سوبر ماركت أولاد يحيى — All Rights Reserved 2026</div>
-    <div class="muted2">إدارة هيثم</div>
+    <div>© Axentro — All Rights Reserved 2024</div>
+    <div class="muted2">By Ahmed Hamouda</div>
   </footer>
 
   <!-- ✅ Modal: Add Payment -->
@@ -322,12 +353,33 @@
 
         <div class="field">
           <label>ملاحظة (اختياري)</label>
-          <input id="payNote" type="text" placeholder="مثال: دفعة أولى / تحويل فودافون كاش" />
+          <input id="payNote" type="text" placeholder="مثال: تحويل فودافون كاش" />
           <div class="help">التعليمات: أي توضيح لطريقة الدفع أو سبب الدفعة.</div>
         </div>
 
         <button id="paySave" class="btn primary" type="button">حفظ الدفعة</button>
         <div id="payError" class="error" hidden>من فضلك املأ تاريخ الدفع والمبلغ.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Modal: PIN Confirm (for delete) -->
+  <div id="pinConfirmModal" class="modal" hidden>
+    <div class="modalCard">
+      <div class="modalHead">
+        <h3>تأكيد الحذف</h3>
+        <button id="pinConfirmClose" class="btn small" type="button">إغلاق</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="field">
+          <label>أدخل PIN (1234) لإتمام الحذف</label>
+          <input id="pinConfirmInput" type="password" inputmode="numeric" placeholder="PIN" />
+          <div class="help">التعليمات: لن يتم الحذف إلا بعد إدخال PIN الصحيح.</div>
+        </div>
+
+        <button id="pinConfirmOk" class="btn danger" type="button">تأكيد الحذف</button>
+        <div id="pinConfirmError" class="error" hidden>PIN غير صحيح.</div>
       </div>
     </div>
   </div>
