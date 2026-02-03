@@ -74,6 +74,10 @@
     <button class="navBtn" data-page="records">📒 السجل</button>
     <button class="navBtn" data-page="payments">💳 المدفوعات</button>
     <button class="navBtn" data-page="ledger">📊 كشف حساب</button>
+
+    <!-- ✅ NEW: Reports -->
+    <button class="navBtn" data-page="reports">📈 التقارير</button>
+
     <button class="navBtn" data-page="trash">🗑️ المحذوفات</button>
   </nav>
 
@@ -308,6 +312,106 @@
           <button id="btnLedger" class="btn" type="button">عرض</button>
           <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
           <div id="ledgerBox" class="ledgerBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ PAGE: REPORTS (NEW) -->
+    <section id="page-reports" class="page" hidden>
+      <div class="pageHead">
+        <h2>التقارير</h2>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="filters">
+            <!-- ✅ Quick range -->
+            <select id="repRangePreset">
+              <option value="today">اليوم</option>
+              <option value="this_month">الشهر الحالي</option>
+              <option value="this_year">السنة الحالية</option>
+              <option value="last_7">آخر 7 أيام</option>
+              <option value="last_30">آخر 30 يوم</option>
+              <option value="custom" selected>فترة مخصصة</option>
+            </select>
+
+            <input id="repFrom" type="date" />
+            <input id="repTo" type="date" />
+
+            <!-- ✅ Type selector -->
+            <select id="repType">
+              <option value="all" selected>كل الأنواع</option>
+              <option value="expense">مصاريف</option>
+              <option value="advance">سُلف</option>
+              <option value="credit_customer">عملاء آجل (فلوس ليا)</option>
+              <option value="credit_supplier">موردين (فلوس عليا)</option>
+              <option value="payments_out">مدفوعات خارجة (دفعت أنا)</option>
+              <option value="receipts_in">متحصلات داخلة (اتدفعتلي أنا)</option>
+            </select>
+
+            <!-- ✅ Party quick filter -->
+            <input id="repParty" type="search" placeholder="فلتر بالاسم/الجهة (اختياري)..." />
+
+            <button id="btnRunReports" class="btn" type="button">تطبيق</button>
+            <button id="btnPrintReports" class="btn ghost" type="button">طباعة / PDF</button>
+          </div>
+        </div>
+
+        <p class="hint" style="margin-top:10px">
+          ملحوظة: “مدفوعات خارجة / متحصلات داخلة” هتشتغل بعد ما نعدّل `app.js` ونضيف نوع الحركة داخل المدفوعات (Out/In).
+        </p>
+
+        <!-- ✅ Reports KPIs -->
+        <div class="kpis" style="margin-top:12px">
+          <div class="kpi">
+            <span class="label">إجمالي العمليات داخل الفترة</span>
+            <span id="repKpiEntries" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي المدفوعات داخل الفترة</span>
+            <span id="repKpiPays" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي (فلوس ليا) داخل الفترة</span>
+            <span id="repKpiReceivable" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي (فلوس عليا) داخل الفترة</span>
+            <span id="repKpiPayable" class="value">—</span>
+          </div>
+        </div>
+
+        <!-- ✅ Entries table -->
+        <div class="tableWrap" style="margin-top:12px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الاسم/الجهة</th>
+                <th>الوصف</th>
+                <th class="num">الإجمالي</th>
+                <th class="num">المدفوع</th>
+                <th class="num">الباقي</th>
+              </tr>
+            </thead>
+            <tbody id="repEntriesTbody"></tbody>
+          </table>
+        </div>
+
+        <!-- ✅ Payments table -->
+        <div class="tableWrap" style="margin-top:12px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>تاريخ الدفع</th>
+                <th>الاسم/الجهة</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody id="repPaysTbody"></tbody>
+          </table>
         </div>
       </div>
     </section>
