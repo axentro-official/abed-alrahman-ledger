@@ -1,13 +1,18 @@
-/* عباد الرحمن — دفتر الحسابات
+/* سوبر ماركت أولاد يحيى — دفتر الحسابات
    ✅ PIN ثابت: 1234
    ✅ مدفوعات منفصلة payments[] مرتبطة بكل عملية entryId
-   ✅ لا يوجد أي 0 تلقائي في الحقول
-   ✅ صفحات (Dashboard / Records / Payments / Ledger) + Logout
-   ✅ Fix: firstPay=0 يعتبر فاضي + لا نسجل العملية قبل التحقق
+   ✅ Refresh لا يعمل Logout (sessionStorage)
+   ✅ دفعة أولى لو 0 تتحول لفاضي
+   ✅ معاينة عملية + طباعة/PDF
+   ✅ معاينة كشف حساب + طباعة/PDF
 */
 
-const LS_KEY = "abed_alrahman_ledger_v2";
+const LS_KEY = "oy_ledger_v3";
 const PIN_CODE = "1234";
+const AUTH_KEY = "oy_auth_v1";
+
+const SHOP_NAME = "سوبر ماركت أولاد يحيى";
+const ADMIN_NAME = "إدارة هيثم";
 
 const el = (id) => document.getElementById(id);
 
@@ -64,7 +69,7 @@ function computeEntryView(entry, payments){
 }
 
 /* ---------- Pages ---------- */
-const PAGES = ["dashboard","records","payments","ledger"];
+const PAGES = ["dashboard","records","payments","ledger","entryPreview","ledgerPreview"];
 
 function showPage(name){
   PAGES.forEach(p=>{
@@ -76,16 +81,50 @@ function showPage(name){
     b.classList.toggle("active", b.dataset.page === name);
   });
 
-  // ✅ ارفع المستخدم لفوق عند التنقل
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ---------- Auth Helpers ---------- */
+function setAuthed(v){
+  if(v) sessionStorage.setItem(AUTH_KEY, "1");
+  else sessionStorage.removeItem(AUTH_KEY);
+}
+function isAuthed(){
+  return sessionStorage.getItem(AUTH_KEY) === "1";
+}
+function openApp(){
+  const gate = el("pinGate");
+  const root = el("appRoot");
+  const nav = el("navBar");
+
+  gate.hidden = true;
+  gate.style.display = "none";
+  root.hidden = false;
+  if(nav) nav.hidden = false;
+
+  showPage("dashboard");
+  refresh();
+}
+function closeApp(){
+  const gate = el("pinGate");
+  const root = el("appRoot");
+  const nav = el("navBar");
+
+  root.hidden = true;
+  if(nav) nav.hidden = true;
+
+  gate.hidden = false;
+  gate.style.display = "block";
+
+  el("pinInput").type = "password";
+  el("pinInput").value = "";
+  el("pinError").hidden = true;
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* ---------- PIN Gate ---------- */
 function setupPinGate(){
-  const gate = el("pinGate");
-  const root = el("appRoot");
-  const nav = el("navBar");
-
   const pinForm = el("pinForm");
   const pinInput = el("pinInput");
   const pinError = el("pinError");
@@ -100,17 +139,11 @@ function setupPinGate(){
     const v = (pinInput.value || "").trim();
 
     if(v === PIN_CODE){
-      gate.hidden = true;
-      gate.style.display = "none";
-      root.hidden = false;
-      if(nav) nav.hidden = false;
-
+      setAuthed(true);
       pinError.hidden = true;
       pinInput.value = "";
       pinInput.type = "password";
-
-      showPage("dashboard");
-      refresh();
+      openApp();
     } else {
       pinError.hidden = false;
       pinInput.focus();
@@ -144,13 +177,16 @@ function getEntryFromForm(){
     createdAt: Date.now()
   };
 
-  // ✅ firstPay: لو فاضي أو 0 -> null (يعني مفيش دفعة)
+  // ✅ دفعة أولى: لو 0 أو أقل -> null + نمسحها من الحقل
   const fpRaw = el("firstPay").value;
   let firstPay = null;
   if(fpRaw !== ""){
     const fpNum = Number(fpRaw);
     if(Number.isFinite(fpNum) && fpNum > 0) firstPay = fpNum;
-    else firstPay = 0; // هنستخدمها للتحقق وإظهار رسالة مناسبة
+    else {
+      firstPay = null;
+      el("firstPay").value = "";
+    }
   }
 
   return { entry, firstPay };
@@ -246,6 +282,7 @@ function renderEntriesTable(entriesView){
       <td class="num">${fmt(e.remaining)}</td>
       <td>
         <div class="rowActions">
+          <button class="btn small" data-act="preview" data-id="${e.id}">معاينة</button>
           <button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>
           <button class="btn small danger" data-act="del" data-id="${e.id}">حذف</button>
         </div>
@@ -306,7 +343,127 @@ function closePayModal(){
   CURRENT_PAY_ENTRY_ID = null;
 }
 
-/* ---------- Ledger ---------- */
+/* ---------- Preview: Entry ---------- */
+let LAST_ENTRY_PREVIEW_ID = null;
+
+function openEntryPreview(entryId){
+  const data = loadData();
+  const entry = data.entries.find(e => e.id === entryId);
+  if(!entry) return;
+
+  const v = computeEntryView(entry, data.payments);
+  LAST_ENTRY_PREVIEW_ID = entryId;
+
+  el("prevEntryMeta").textContent = `تاريخ الإنشاء: ${new Date(entry.createdAt).toLocaleString("ar-EG")}`;
+  el("prevEntryStatus").textContent = (v.remaining === 0) ? "الحالة: مقفول" : `الحالة: عليه باقي ${fmt(v.remaining)} ج.م`;
+
+  el("prevDate").textContent = v.date || "—";
+  el("prevType").textContent = typeLabel(v.type);
+  el("prevParty").textContent = v.party || "—";
+  el("prevDesc").textContent = v.desc || "—";
+  el("prevCat").textContent = (v.type === "expense" ? (v.category || "—") : "—");
+  el("prevNotes").textContent = v.notes || "—";
+  el("prevTotal").textContent = `${fmt(v.total)} ج.م`;
+  el("prevPaidRemain").textContent = `${fmt(v.paid)} / ${fmt(v.remaining)} ج.م`;
+
+  const pays = data.payments
+    .filter(p => p.entryId === entryId)
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+
+  const tb = el("prevPaysTbody");
+  tb.innerHTML = "";
+  if(pays.length === 0){
+    tb.innerHTML = `<tr><td colspan="3">لا توجد مدفوعات لهذه العملية.</td></tr>`;
+  }else{
+    for(const p of pays){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.date || "—"}</td>
+        <td>${escapeHtml(p.note || "—")}</td>
+        <td class="num">${fmt(p.amount)}</td>
+      `;
+      tb.appendChild(tr);
+    }
+  }
+
+  showPage("entryPreview");
+}
+
+/* ---------- Preview: Ledger ---------- */
+let LAST_LEDGER_NAME = "";
+
+function buildLedgerData(name){
+  const key = (name || "").trim().toLowerCase();
+  const data = loadData();
+
+  const entries = data.entries
+    .filter(e => (e.party || "").trim().toLowerCase() === key)
+    .map(e => computeEntryView(e, data.payments))
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+
+  const pays = data.payments
+    .filter(p => (p.party || "").trim().toLowerCase() === key)
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+
+  return { key, entries, pays };
+}
+
+function openLedgerPreview(name){
+  const { key, entries, pays } = buildLedgerData(name);
+  if(!key) return alert("اكتب الاسم أولاً.");
+
+  if(entries.length === 0 && pays.length === 0){
+    return alert("لا توجد بيانات لهذا الاسم.");
+  }
+
+  LAST_LEDGER_NAME = name;
+
+  const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
+  const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
+  const rem   = entries.reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
+
+  el("prevLedgerMeta").textContent = `الاسم: ${name} • تاريخ: ${new Date().toLocaleDateString("ar-EG")}`;
+  el("prevLedgerSummary").textContent = `الإجمالي: ${fmt(total)} • المدفوع: ${fmt(paid)} • الباقي: ${fmt(rem)}`;
+
+  const te = el("prevLedgerEntriesTbody");
+  te.innerHTML = "";
+  if(entries.length === 0){
+    te.innerHTML = `<tr><td colspan="6">لا توجد عمليات.</td></tr>`;
+  }else{
+    for(const e of entries){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${e.date || "—"}</td>
+        <td>${typeLabel(e.type)}</td>
+        <td>${escapeHtml(e.desc || "—")}</td>
+        <td class="num">${fmt(e.total)}</td>
+        <td class="num">${fmt(e.paid)}</td>
+        <td class="num">${fmt(e.remaining)}</td>
+      `;
+      te.appendChild(tr);
+    }
+  }
+
+  const tp = el("prevLedgerPaysTbody");
+  tp.innerHTML = "";
+  if(pays.length === 0){
+    tp.innerHTML = `<tr><td colspan="3">لا توجد مدفوعات.</td></tr>`;
+  }else{
+    for(const p of pays){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.date || "—"}</td>
+        <td>${escapeHtml(p.note || "—")}</td>
+        <td class="num">${fmt(p.amount)}</td>
+      `;
+      tp.appendChild(tr);
+    }
+  }
+
+  showPage("ledgerPreview");
+}
+
+/* ---------- Ledger (Normal) ---------- */
 function showLedger(name){
   const box = el("ledgerBox");
   box.innerHTML = "";
@@ -382,7 +539,7 @@ function exportJSON(data){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `abed-alrahman-ledger-backup-${todayISO()}.json`;
+  a.download = `oy-backup-${todayISO()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -426,9 +583,13 @@ function refresh(){
 
 /* ---------- Events ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  // ✅ لو حصل خطأ في DOM، ما يوقفش كل حاجة بصمت
   try{
     setupPinGate();
+
+    // ✅ Auto login after refresh (same tab)
+    if(isAuthed()){
+      openApp();
+    }
 
     // ✅ Navigation
     document.querySelectorAll(".navBtn").forEach(btn=>{
@@ -440,27 +601,22 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.addEventListener("click", ()=> showPage("dashboard"));
     });
 
-    // ✅ Logout (لازم id=btnLogout موجود في index)
+    // ✅ Logout
     const logoutBtn = el("btnLogout");
     if(logoutBtn){
       logoutBtn.addEventListener("click", ()=>{
         if(confirm("هل تريد تسجيل الخروج؟")){
-          el("appRoot").hidden = true;
-          const nav = el("navBar");
-          if(nav) nav.hidden = true;
-
-          const gate = el("pinGate");
-          gate.hidden = false;
-          gate.style.display = "block";
-
-          el("pinInput").type = "password";
-          el("pinInput").value = "";
-          el("pinError").hidden = true;
-
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          setAuthed(false);
+          closeApp();
         }
       });
     }
+
+    // ✅ firstPay: لو المستخدم كتب 0 في أي وقت نمسحه تلقائي
+    el("firstPay")?.addEventListener("input", ()=>{
+      const v = el("firstPay").value;
+      if(v !== "" && Number(v) <= 0) el("firstPay").value = "";
+    });
 
     // ✅ Add Entry
     el("entryForm").addEventListener("submit", (ev)=>{
@@ -470,18 +626,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const err = validateEntry(entry);
       if(err) return alert(err);
 
-      // ✅ validate firstPay BEFORE saving entry
-      if(firstPay === 0){
-        return alert("لو مفيش دفعة أولى سيب الخانة فاضية، ولو فيه لازم تكون أكبر من 0.");
-      }
-      if(firstPay !== null){
-        if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
-      }
-
-      // ✅ now save
       addEntry(entry);
 
       if(firstPay !== null){
+        if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
         addPayment({
           id: uid(),
           entryId: entry.id,
@@ -506,7 +654,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     el("payQ").addEventListener("input", refresh);
 
-    // Table actions
+    // Table actions (preview/pay/delete)
     el("tbody").addEventListener("click", (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
@@ -524,7 +672,18 @@ document.addEventListener("DOMContentLoaded", () => {
         openPayModal(id);
         return;
       }
+      if(act === "preview"){
+        openEntryPreview(id);
+        return;
+      }
     });
+
+    // Preview buttons
+    el("btnBackFromEntryPreview")?.addEventListener("click", ()=> showPage("records"));
+    el("btnPrintEntry")?.addEventListener("click", ()=> window.print());
+
+    el("btnBackFromLedgerPreview")?.addEventListener("click", ()=> showPage("ledger"));
+    el("btnPrintLedger")?.addEventListener("click", ()=> window.print());
 
     // Payment modal
     el("payClose").addEventListener("click", closePayModal);
@@ -596,8 +755,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Ledger
     el("btnLedger").addEventListener("click", ()=> showLedger(el("ledgerName").value));
+    el("btnLedgerPreview")?.addEventListener("click", ()=> openLedgerPreview(el("ledgerName").value));
+
   }catch(e){
-    alert("فيه خطأ حصل في تشغيل الصفحة. غالبًا بسبب كاش قديم. امسح كاش الموقع وافتح تاني.");
+    alert("فيه خطأ حصل في تشغيل الصفحة. امسح كاش الموقع وافتح تاني.");
     console.error(e);
   }
 });
