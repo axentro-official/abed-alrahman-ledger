@@ -3,6 +3,7 @@
    ✅ مدفوعات منفصلة payments[] مرتبطة بكل عملية entryId
    ✅ لا يوجد أي 0 تلقائي في الحقول
    ✅ صفحات (Dashboard / Records / Payments / Ledger) + Logout
+   ✅ Fix: firstPay=0 يعتبر فاضي + لا نسجل العملية قبل التحقق
 */
 
 const LS_KEY = "abed_alrahman_ledger_v2";
@@ -17,9 +18,7 @@ const fmt = (n) => {
 };
 const uid = () => `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-function todayISO(){
-  return new Date().toISOString().slice(0,10);
-}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 function loadData(){
   try{
@@ -32,9 +31,7 @@ function loadData(){
     return { entries: [], payments: [] };
   }
 }
-function saveData(data){
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
+function saveData(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 
 function typeLabel(t){
   return ({
@@ -55,8 +52,7 @@ function escapeHtml(str){
 }
 
 function sumPaymentsForEntry(entryId, payments){
-  return payments
-    .filter(p => p.entryId === entryId)
+  return payments.filter(p => p.entryId === entryId)
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
 }
 
@@ -79,6 +75,9 @@ function showPage(name){
   document.querySelectorAll(".navBtn").forEach(b=>{
     b.classList.toggle("active", b.dataset.page === name);
   });
+
+  // ✅ ارفع المستخدم لفوق عند التنقل
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* ---------- PIN Gate ---------- */
@@ -86,12 +85,12 @@ function setupPinGate(){
   const gate = el("pinGate");
   const root = el("appRoot");
   const nav = el("navBar");
+
   const pinForm = el("pinForm");
   const pinInput = el("pinInput");
   const pinError = el("pinError");
   const toggle = el("pinToggle");
 
-  // ✅ Toggle show/hide PIN
   toggle?.addEventListener("click", ()=>{
     pinInput.type = (pinInput.type === "password") ? "text" : "password";
   });
@@ -102,9 +101,9 @@ function setupPinGate(){
 
     if(v === PIN_CODE){
       gate.hidden = true;
-      gate.style.display = "none";   // ✅ تأكيد إضافي
+      gate.style.display = "none";
       root.hidden = false;
-      nav.hidden = false;
+      if(nav) nav.hidden = false;
 
       pinError.hidden = true;
       pinInput.value = "";
@@ -145,7 +144,14 @@ function getEntryFromForm(){
     createdAt: Date.now()
   };
 
-  const firstPay = el("firstPay").value === "" ? null : Number(el("firstPay").value);
+  // ✅ firstPay: لو فاضي أو 0 -> null (يعني مفيش دفعة)
+  const fpRaw = el("firstPay").value;
+  let firstPay = null;
+  if(fpRaw !== ""){
+    const fpNum = Number(fpRaw);
+    if(Number.isFinite(fpNum) && fpNum > 0) firstPay = fpNum;
+    else firstPay = 0; // هنستخدمها للتحقق وإظهار رسالة مناسبة
+  }
 
   return { entry, firstPay };
 }
@@ -165,20 +171,17 @@ function addEntry(entry){
   data.entries.push(entry);
   saveData(data);
 }
-
 function addPayment(payment){
   const data = loadData();
   data.payments.push(payment);
   saveData(data);
 }
-
 function deleteEntry(entryId){
   const data = loadData();
   data.entries = data.entries.filter(e => e.id !== entryId);
-  data.payments = data.payments.filter(p => p.entryId !== entryId); // حذف مدفوعاته
+  data.payments = data.payments.filter(p => p.entryId !== entryId);
   saveData(data);
 }
-
 function deletePayment(payId){
   const data = loadData();
   data.payments = data.payments.filter(p => p.id !== payId);
@@ -281,9 +284,7 @@ function renderPaymentsTable(payments, entries){
       <td>${escapeHtml(ref)}</td>
       <td class="num">${fmt(p.amount)}</td>
       <td>${escapeHtml(p.note || "—")}</td>
-      <td>
-        <button class="btn small danger" data-paydel="${p.id}">حذف</button>
-      </td>
+      <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
     `;
     tbody.appendChild(tr);
   }
@@ -300,7 +301,6 @@ function openPayModal(entryId){
   el("payError").hidden = true;
   el("payModal").hidden = false;
 }
-
 function closePayModal(){
   el("payModal").hidden = true;
   CURRENT_PAY_ENTRY_ID = null;
@@ -388,12 +388,10 @@ function exportJSON(data){
   a.remove();
   URL.revokeObjectURL(url);
 }
-
 function exportPaymentsOnly(){
   const data = loadData();
   exportJSON({ payments: data.payments, exportedAt: Date.now() });
 }
-
 function importJSON(file){
   const reader = new FileReader();
   reader.onload = () => {
@@ -405,9 +403,7 @@ function importJSON(file){
       if(Array.isArray(obj.entries) || Array.isArray(obj.payments)){
         data.entries = Array.isArray(obj.entries) ? obj.entries : data.entries;
         data.payments = Array.isArray(obj.payments) ? obj.payments : data.payments;
-      } else {
-        throw new Error("bad");
-      }
+      } else throw new Error("bad");
 
       saveData(data);
       refresh();
@@ -423,7 +419,6 @@ function importJSON(file){
 function refresh(){
   const data = loadData();
   const entriesView = data.entries.map(e => computeEntryView(e, data.payments));
-
   renderKPIs(entriesView, data.payments);
   renderEntriesTable(applyEntryFilters(entriesView));
   renderPaymentsTable(data.payments, data.entries);
@@ -431,164 +426,178 @@ function refresh(){
 
 /* ---------- Events ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  setupPinGate();
+  // ✅ لو حصل خطأ في DOM، ما يوقفش كل حاجة بصمت
+  try{
+    setupPinGate();
 
-  // ✅ Navigation buttons
-  document.querySelectorAll(".navBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=> showPage(btn.dataset.page));
-  });
+    // ✅ Navigation
+    document.querySelectorAll(".navBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=> showPage(btn.dataset.page));
+    });
 
-  // ✅ Back to dashboard buttons
-  document.querySelectorAll("[data-go='dashboard']").forEach(btn=>{
-    btn.addEventListener("click", ()=> showPage("dashboard"));
-  });
+    // ✅ Back to dashboard buttons
+    document.querySelectorAll("[data-go='dashboard']").forEach(btn=>{
+      btn.addEventListener("click", ()=> showPage("dashboard"));
+    });
 
-  // ✅ Logout
-  el("btnLogout").addEventListener("click", ()=>{
-    if(confirm("هل تريد تسجيل الخروج؟")){
-      el("appRoot").hidden = true;
-      el("navBar").hidden = true;
+    // ✅ Logout (لازم id=btnLogout موجود في index)
+    const logoutBtn = el("btnLogout");
+    if(logoutBtn){
+      logoutBtn.addEventListener("click", ()=>{
+        if(confirm("هل تريد تسجيل الخروج؟")){
+          el("appRoot").hidden = true;
+          const nav = el("navBar");
+          if(nav) nav.hidden = true;
 
-      const gate = el("pinGate");
-      gate.hidden = false;
-      gate.style.display = "block";
+          const gate = el("pinGate");
+          gate.hidden = false;
+          gate.style.display = "block";
 
-      el("pinInput").type = "password";
-      el("pinInput").value = "";
-      el("pinError").hidden = true;
+          el("pinInput").type = "password";
+          el("pinInput").value = "";
+          el("pinError").hidden = true;
+
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
     }
-  });
 
-  // نموذج إضافة عملية
-  el("entryForm").addEventListener("submit", (ev)=>{
-    ev.preventDefault();
+    // ✅ Add Entry
+    el("entryForm").addEventListener("submit", (ev)=>{
+      ev.preventDefault();
 
-    const { entry, firstPay } = getEntryFromForm();
-    const err = validateEntry(entry);
-    if(err) return alert(err);
+      const { entry, firstPay } = getEntryFromForm();
+      const err = validateEntry(entry);
+      if(err) return alert(err);
 
-    addEntry(entry);
+      // ✅ validate firstPay BEFORE saving entry
+      if(firstPay === 0){
+        return alert("لو مفيش دفعة أولى سيب الخانة فاضية، ولو فيه لازم تكون أكبر من 0.");
+      }
+      if(firstPay !== null){
+        if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
+      }
 
-    // لو في دفعة أولى (اختياري)
-    if(firstPay !== null){
-      if(!Number.isFinite(firstPay) || firstPay <= 0) return alert("الدفعة الأولى لازم تكون رقم أكبر من صفر أو سيبها فاضية.");
-      if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
+      // ✅ now save
+      addEntry(entry);
+
+      if(firstPay !== null){
+        addPayment({
+          id: uid(),
+          entryId: entry.id,
+          date: entry.date,
+          party: entry.party,
+          amount: firstPay,
+          note: "دفعة أولى",
+          createdAt: Date.now()
+        });
+      }
+
+      resetForm();
+      refresh();
+    });
+
+    el("btnReset").addEventListener("click", resetForm);
+
+    // Filters
+    ["q","filterType","filterOpen"].forEach(id=>{
+      el(id).addEventListener("input", refresh);
+      el(id).addEventListener("change", refresh);
+    });
+    el("payQ").addEventListener("input", refresh);
+
+    // Table actions
+    el("tbody").addEventListener("click", (ev)=>{
+      const btn = ev.target.closest("button");
+      if(!btn) return;
+      const act = btn.dataset.act;
+      const id = btn.dataset.id;
+
+      if(act === "del"){
+        if(confirm("متأكد حذف العملية؟ (سيتم حذف المدفوعات التابعة لها أيضًا)")){
+          deleteEntry(id);
+          refresh();
+        }
+        return;
+      }
+      if(act === "pay"){
+        openPayModal(id);
+        return;
+      }
+    });
+
+    // Payment modal
+    el("payClose").addEventListener("click", closePayModal);
+    el("payModal").addEventListener("click", (ev)=>{
+      if(ev.target === el("payModal")) closePayModal();
+    });
+
+    el("paySave").addEventListener("click", ()=>{
+      const data = loadData();
+      const entry = data.entries.find(e => e.id === CURRENT_PAY_ENTRY_ID);
+      if(!entry) return closePayModal();
+
+      const date = (el("payDate").value || "").trim();
+      const amount = el("payAmount").value === "" ? null : Number(el("payAmount").value);
+      const note = (el("payNote").value || "").trim();
+
+      if(!date || amount === null || !Number.isFinite(amount) || amount <= 0){
+        el("payError").hidden = false;
+        return;
+      }
 
       addPayment({
         id: uid(),
         entryId: entry.id,
-        date: entry.date,
+        date,
         party: entry.party,
-        amount: firstPay,
-        note: "دفعة أولى",
+        amount,
+        note,
         createdAt: Date.now()
       });
-    }
 
-    resetForm();
-    refresh();
-  });
-
-  el("btnReset").addEventListener("click", resetForm);
-
-  // فلاتر العمليات
-  ["q","filterType","filterOpen"].forEach(id=>{
-    el(id).addEventListener("input", refresh);
-    el(id).addEventListener("change", refresh);
-  });
-
-  // فلاتر المدفوعات
-  el("payQ").addEventListener("input", refresh);
-
-  // أزرار الجدول (إضافة دفعة / حذف عملية)
-  el("tbody").addEventListener("click", (ev)=>{
-    const btn = ev.target.closest("button");
-    if(!btn) return;
-    const act = btn.dataset.act;
-    const id = btn.dataset.id;
-
-    if(act === "del"){
-      if(confirm("متأكد حذف العملية؟ (سيتم حذف المدفوعات التابعة لها أيضًا)")){
-        deleteEntry(id);
-        refresh();
-      }
-      return;
-    }
-    if(act === "pay"){
-      openPayModal(id);
-      return;
-    }
-  });
-
-  // مودال الدفعات
-  el("payClose").addEventListener("click", closePayModal);
-  el("payModal").addEventListener("click", (ev)=>{
-    if(ev.target === el("payModal")) closePayModal();
-  });
-
-  el("paySave").addEventListener("click", ()=>{
-    const data = loadData();
-    const entry = data.entries.find(e => e.id === CURRENT_PAY_ENTRY_ID);
-    if(!entry) return closePayModal();
-
-    const date = (el("payDate").value || "").trim();
-    const amount = el("payAmount").value === "" ? null : Number(el("payAmount").value);
-    const note = (el("payNote").value || "").trim();
-
-    if(!date || amount === null || !Number.isFinite(amount) || amount <= 0){
-      el("payError").hidden = false;
-      return;
-    }
-
-    addPayment({
-      id: uid(),
-      entryId: entry.id,
-      date,
-      party: entry.party,
-      amount,
-      note,
-      createdAt: Date.now()
+      closePayModal();
+      refresh();
     });
 
-    closePayModal();
-    refresh();
-  });
+    // Delete payment
+    el("payTbody").addEventListener("click", (ev)=>{
+      const btn = ev.target.closest("button");
+      if(!btn) return;
+      const payId = btn.dataset.paydel;
+      if(!payId) return;
 
-  // حذف دفعة من جدول المدفوعات
-  el("payTbody").addEventListener("click", (ev)=>{
-    const btn = ev.target.closest("button");
-    if(!btn) return;
-    const payId = btn.dataset.paydel;
-    if(!payId) return;
+      if(confirm("متأكد حذف الدفعة؟")){
+        deletePayment(payId);
+        refresh();
+      }
+    });
 
-    if(confirm("متأكد حذف الدفعة؟")){
-      deletePayment(payId);
-      refresh();
-    }
-  });
+    // Clear all
+    el("btnClearAll").addEventListener("click", ()=>{
+      if(confirm("تحذير: سيتم حذف كل البيانات نهائيًا من هذا الجهاز. هل أنت متأكد؟")){
+        localStorage.removeItem(LS_KEY);
+        refresh();
+        alert("تم الحذف ✅");
+      }
+    });
 
-  // حذف كل البيانات
-  el("btnClearAll").addEventListener("click", ()=>{
-    if(confirm("تحذير: سيتم حذف كل البيانات نهائيًا من هذا الجهاز. هل أنت متأكد؟")){
-      localStorage.removeItem(LS_KEY);
-      refresh();
-      alert("تم الحذف ✅");
-    }
-  });
+    // Export/Import/Print
+    el("btnExport").addEventListener("click", ()=> exportJSON(loadData()));
+    el("btnPaymentsExport").addEventListener("click", exportPaymentsOnly);
 
-  // تصدير/استيراد
-  el("btnExport").addEventListener("click", ()=> exportJSON(loadData()));
-  el("btnPaymentsExport").addEventListener("click", exportPaymentsOnly);
+    el("fileImport").addEventListener("change", (ev)=>{
+      const f = ev.target.files?.[0];
+      if(f) importJSON(f);
+      ev.target.value = "";
+    });
 
-  el("fileImport").addEventListener("change", (ev)=>{
-    const f = ev.target.files?.[0];
-    if(f) importJSON(f);
-    ev.target.value = "";
-  });
+    el("btnPrint").addEventListener("click", ()=> window.print());
 
-  // طباعة (يطبع الصفحة الحالية كما هي)
-  el("btnPrint").addEventListener("click", ()=> window.print());
-
-  // كشف حساب
-  el("btnLedger").addEventListener("click", ()=> showLedger(el("ledgerName").value));
+    // Ledger
+    el("btnLedger").addEventListener("click", ()=> showLedger(el("ledgerName").value));
+  }catch(e){
+    alert("فيه خطأ حصل في تشغيل الصفحة. غالبًا بسبب كاش قديم. امسح كاش الموقع وافتح تاني.");
+    console.error(e);
+  }
 });
