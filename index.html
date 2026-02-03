@@ -84,24 +84,41 @@
       <div class="grid">
         <div class="card">
           <h2>ملخص سريع</h2>
+
+          <!-- ✅ UPDATED KPIs -->
           <div class="kpis">
             <div class="kpi">
-              <span class="label">إجمالي المصروفات (إجمالي العمليات نوع مصروف)</span>
+              <span class="label">إجمالي المصروفات</span>
               <span id="kpiExpenses" class="value">—</span>
             </div>
+
             <div class="kpi">
               <span class="label">إجمالي المدفوعات</span>
               <span id="kpiPaid" class="value">—</span>
             </div>
+
+            <!-- ✅ NEW: فلوس ليا -->
             <div class="kpi">
-              <span class="label">إجمالي المستحق (باقي)</span>
-              <span id="kpiRemaining" class="value">—</span>
+              <span class="label">فلوس ليا (عملاء + سلف)</span>
+              <span id="kpiReceivable" class="value">—</span>
             </div>
+
+            <!-- ✅ NEW: فلوس عليا -->
+            <div class="kpi">
+              <span class="label">فلوس عليا (موردين)</span>
+              <span id="kpiPayable" class="value">—</span>
+            </div>
+
             <div class="kpi">
               <span class="label">عدد العمليات</span>
               <span id="kpiCount" class="value">—</span>
             </div>
           </div>
+
+          <!-- ✅ NOTE -->
+          <p class="hint" style="margin-top:10px">
+            * “فلوس ليا” = آجل عميل + سُلفة. — “فلوس عليا” = فواتير موردين. — المصروفات ليست مستحقات.
+          </p>
         </div>
 
         <div class="card">
@@ -279,6 +296,14 @@
 
       <div class="card">
         <div class="ledger">
+
+          <!-- ✅ NEW: Mode selector -->
+          <select id="ledgerMode">
+            <option value="all" selected>الكل</option>
+            <option value="customer">عملاء فقط (فلوس ليا)</option>
+            <option value="supplier">موردين فقط (فلوس عليا)</option>
+          </select>
+
           <input id="ledgerName" type="text" placeholder="اكتب الاسم (جزء من الاسم يكفي)..." />
           <button id="btnLedger" class="btn" type="button">عرض</button>
           <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
@@ -305,14 +330,11 @@
             <thead>
               <tr>
                 <th>وقت الحذف</th>
-                <th>التاريخ</th>
                 <th>النوع</th>
                 <th>الاسم/الجهة</th>
-                <th>الوصف</th>
-                <th class="num">الإجمالي</th>
-                <th class="num">مدفوع</th>
-                <th class="num">باقي</th>
+                <th class="num">المبلغ</th>
                 <th>سبب</th>
+                <th>إجراء</th>
               </tr>
             </thead>
             <tbody id="trashTbody"></tbody>
