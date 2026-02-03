@@ -148,13 +148,6 @@ input::placeholder{color: rgba(169,183,208,.7)}
 
 .rowActions{display:flex; gap:6px; flex-wrap:wrap}
 
-.footer{
-  padding:18px 14px 30px;
-  color:var(--muted);
-  text-align:center;
-  font-size:12px;
-}
-
 .ledger{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .ledger input{min-width: 260px}
 .ledgerBox{
@@ -172,36 +165,6 @@ input::placeholder{color: rgba(169,183,208,.7)}
 }
 .ledgerBox .line:last-child{border-bottom:none}
 .ledgerBox .muted{color:var(--muted)}
-
-/* ✅ PIN Gate */
-.gate{
-  position:fixed; inset:0; z-index:999;
-  display:grid; place-items:center;
-  background: rgba(3,6,18,.72);
-  backdrop-filter: blur(10px);
-  padding:16px;
-}
-.gateCard{
-  width:min(460px, 100%);
-  border:1px solid var(--stroke);
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(15,26,46,.95), rgba(12,22,41,.95));
-  box-shadow: var(--shadow);
-  padding:16px;
-}
-.gateBrand{display:flex; gap:12px; align-items:center; margin-bottom:12px}
-.gateBrand h2{margin:0; font-size:18px}
-.gateBrand p{margin:2px 0 0; color:var(--muted); font-size:12px}
-.gateForm .lbl{display:block; color:var(--muted); font-size:12px; margin-bottom:6px}
-.error{
-  margin-top:10px;
-  padding:10px 12px;
-  border-radius: 14px;
-  border:1px solid rgba(255,80,80,.35);
-  background: rgba(255,80,80,.10);
-  color: #ffd1d1;
-  font-size: 12px;
-}
 
 /* ✅ Modal */
 .modal{
@@ -226,3 +189,120 @@ input::placeholder{color: rgba(169,183,208,.7)}
 }
 .modalHead h3{margin:0; font-size:16px}
 .modalBody{display:grid; gap:10px}
+
+.error{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius: 14px;
+  border:1px solid rgba(255,80,80,.35);
+  background: rgba(255,80,80,.10);
+  color: #ffd1d1;
+  font-size: 12px;
+}
+
+/* ✅ New PIN screen like screenshot */
+.gate{
+  position:fixed; inset:0; z-index:999;
+  background:
+    radial-gradient(1200px 700px at 60% -10%, rgba(0,140,255,.18), transparent 60%),
+    radial-gradient(900px 650px at 10% 10%, rgba(0,188,212,.14), transparent 55%),
+    rgba(3,6,18,.75);
+  backdrop-filter: blur(12px);
+}
+.gateShell{
+  position:absolute; inset:0;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding:18px;
+}
+.gateCard2{
+  width:min(720px, 100%);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(12,20,38,.92), rgba(10,16,30,.92));
+  box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  padding:16px;
+}
+.gateHead2{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.gateAvatar{
+  width:44px; height:44px;
+  border-radius: 16px;
+  display:grid; place-items:center;
+  font-weight:900;
+  background: linear-gradient(135deg, rgba(0,140,255,.95), rgba(0,188,212,.8));
+}
+.gateTitleWrap{flex:1}
+.gateTitle{font-size:20px; font-weight:900; margin-bottom:4px}
+.gateSub{color: rgba(169,183,208,.92); font-size:12px}
+
+.gateForm2{display:grid; gap:10px}
+
+.pinLbl{display:block; color: rgba(169,183,208,.95); font-size:12px}
+
+.pinInputWrap{
+  position:relative;
+  border-radius: 18px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+}
+.pinInput{
+  width:100%;
+  padding:14px 46px 14px 14px;
+  border:0;
+  outline:0;
+  background: transparent;
+  color: var(--text);
+  border-radius: 18px;
+}
+.pinToggle{
+  position:absolute;
+  left:10px;
+  top:50%;
+  transform:translateY(-50%);
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+  color: var(--text);
+  border-radius: 14px;
+  padding:8px 10px;
+  cursor:pointer;
+}
+.btnPin{
+  width:max-content;
+  margin-right:auto;
+  padding:12px 18px;
+  border:0;
+  cursor:pointer;
+  border-radius: 18px;
+  color:#fff;
+  font-weight:900;
+  background: linear-gradient(135deg, rgba(0,140,255,.95), rgba(0,188,212,.85));
+}
+.warnLine{
+  margin-top:6px;
+  color: rgba(169,183,208,.9);
+  font-size:12px;
+}
+
+/* ✅ Footer like screenshot */
+.footer2{
+  padding:24px 14px 34px;
+  text-align:center;
+  color:#0f172a;
+  background: rgba(255,255,255,.65);
+}
+.footer2 .muted2{
+  margin-top:6px;
+  color: rgba(15,23,42,.70);
+  font-weight:700;
+}
+
+/* ✅ الحل النهائي لمشكلة ظهور الـPIN بعد الدخول */
+[hidden]{ display:none !important; }
+.gate[hidden], .modal[hidden]{ display:none !important; }
