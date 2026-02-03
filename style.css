@@ -643,6 +643,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
     border-radius: 6mm !important;
   }
 }
+
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
 .ledger select{
   min-width: 210px;
@@ -672,5 +673,149 @@ input::placeholder{color: rgba(169,183,208,.7)}
   .ledger button{
     width: 100%;
     min-width: 0 !important;
+  }
+}
+
+/* =========================================================
+   ✅ REPORTS PAGE (NEW)
+   ========================================================= */
+
+/* شريط فلاتر التقارير */
+.repToolbar{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+  justify-content:space-between;
+}
+
+.repFilters{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+}
+
+.repFilters .field{
+  min-width: 180px;
+}
+
+.repFilters .field.sm{ min-width: 150px; }
+.repFilters .field.lg{ min-width: 260px; }
+
+@media (max-width: 560px){
+  .repToolbar,
+  .repFilters{
+    width:100%;
+  }
+  .repFilters .field,
+  .repFilters .field.sm,
+  .repFilters .field.lg{
+    min-width: 0;
+    width:100%;
+  }
+}
+
+/* KPIs الخاصة بالتقارير */
+.repKpis{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap:10px;
+  margin-top: 12px;
+}
+
+@media (max-width: 980px){
+  .repKpis{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* تقسيمة جدولين (عمليات / مدفوعات) */
+.repSplit{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:14px;
+  margin-top: 12px;
+}
+
+@media (max-width: 980px){
+  .repSplit{ grid-template-columns: 1fr; }
+}
+
+/* عنوان صغير فوق كل جدول في التقارير */
+.repTitle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin: 8px 0 10px;
+}
+.repTitle h3{
+  margin:0;
+  font-size:14px;
+}
+.repTitle .muted{
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* جدول التقارير يكون أخف شوية */
+.repTable{
+  min-width: 780px; /* أقل من جدول السجل */
+}
+@media (max-width: 980px){
+  .repTable{ min-width: 680px; }
+}
+@media (max-width: 560px){
+  .repTable{ min-width: 640px; }
+}
+
+/* =========================================================
+   ✅ Payment Flow Select (payFlow) — مظهر متناسق
+   ========================================================= */
+
+#payFlow{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  padding-inline-end: 42px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(231,238,252,.85) 50%),
+    linear-gradient(135deg, rgba(231,238,252,.85) 50%, transparent 50%);
+  background-position:
+    14px 50%,
+    20px 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat:no-repeat;
+}
+
+/* =========================================================
+   ✅ Print: Reports page تحسين
+   ========================================================= */
+@media print{
+  /* لو صفحة التقارير ظاهرة: خلي كروت التقارير تظهر */
+  #page-reports .card{
+    display:block !important;
+  }
+
+  /* داخل التقارير: نخلي الجداول تاخد العرض */
+  #page-reports .repSplit{
+    display:block !important;
+  }
+
+  /* الجداول في التقارير */
+  #page-reports .tableWrap{
+    border: 1px solid #e5e7eb !important;
+  }
+  #page-reports table{
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  /* KPIs التقارير */
+  #page-reports .repKpis{
+    display:grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap:10px !important;
   }
 }
