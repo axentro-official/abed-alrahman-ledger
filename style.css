@@ -1,308 +1,67 @@
-:root{
-  --bg:#0b1220;
-  --card:#0f1a2e;
-  --card2:#0c1629;
-  --text:#e7eefc;
-  --muted:#a9b7d0;
-  --stroke:rgba(255,255,255,.10);
-  --shadow:0 18px 50px rgba(0,0,0,.45);
-  --radius:18px;
-}
-
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial;
-  background: radial-gradient(1200px 700px at 80% -10%, rgba(92,124,250,.22), transparent 60%),
-              radial-gradient(900px 650px at 10% 10%, rgba(0,188,212,.16), transparent 55%),
-              var(--bg);
-  color:var(--text);
-}
-
-.topbar{
-  position:sticky; top:0; z-index:10;
-  display:flex; gap:12px; align-items:center; justify-content:space-between;
-  padding:14px 16px;
-  background: rgba(11,18,32,.75);
-  backdrop-filter: blur(10px);
-  border-bottom:1px solid var(--stroke);
-}
-
-.brand{display:flex; gap:12px; align-items:center}
-.logo{
-  width:42px; height:42px; border-radius:14px;
-  display:grid; place-items:center;
-  background: linear-gradient(135deg, rgba(92,124,250,.9), rgba(0,188,212,.75));
-  font-weight:800;
-}
-h1{margin:0; font-size:18px; line-height:1.1}
-.brand p{margin:2px 0 0; color:var(--muted); font-size:12px}
-
-.actions{display:flex; gap:8px; flex-wrap:wrap}
-
-.container{max-width:1200px; margin:18px auto; padding:0 14px 28px}
-.grid{
-  display:grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap:14px;
-}
-@media (max-width: 980px){ .grid{grid-template-columns:1fr} }
-
-.card{
-  background: linear-gradient(180deg, rgba(15,26,46,.92), rgba(12,22,41,.92));
-  border:1px solid var(--stroke);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding:14px;
-}
-
-.card h2{margin:0 0 12px; font-size:16px}
-
-.kpis{
-  display:grid;
-  grid-template-columns: repeat(2, minmax(0,1fr));
-  gap:10px;
-}
-.kpi{
-  background: rgba(255,255,255,.05);
-  border:1px solid var(--stroke);
-  border-radius: 14px;
-  padding:10px;
-}
-.kpi .label{display:block; color:var(--muted); font-size:12px}
-.kpi .value{display:block; font-size:18px; font-weight:800; margin-top:6px}
-
-.form .row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px}
-@media (max-width: 560px){ .form .row{grid-template-columns:1fr} }
-
-.field label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px}
-input, select{
-  width:100%;
-  padding:11px 12px;
-  border-radius: 14px;
-  border:1px solid var(--stroke);
-  background: rgba(255,255,255,.04);
-  color: var(--text);
-  outline: none;
-}
-input::placeholder{color: rgba(169,183,208,.7)}
-
-.help{
-  margin-top:6px;
-  color: rgba(169,183,208,.85);
-  font-size: 12px;
-  line-height: 1.35;
-}
-.hint{margin:8px 0 0; color:var(--muted); font-size:12px}
-
-.btn{
-  padding:10px 12px;
-  border-radius: 14px;
-  border:1px solid var(--stroke);
-  background: rgba(255,255,255,.05);
-  color: var(--text);
-  cursor:pointer;
-  font-weight:700;
-}
-.btn:hover{filter: brightness(1.08)}
-.btn.primary{
-  border-color: rgba(92,124,250,.55);
-  background: linear-gradient(135deg, rgba(92,124,250,.85), rgba(0,188,212,.70));
-}
-.btn.ghost{background: rgba(255,255,255,.03)}
-.btn.danger{
-  border-color: rgba(255,80,80,.55);
-  background: rgba(255,80,80,.10);
-}
-.small{padding:7px 9px; font-size:12px; border-radius:12px}
-
-.toolbar{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:10px; flex-wrap:wrap;
-}
-.filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-.filters input, .filters select{min-width: 180px}
-
-.tableWrap{overflow:auto; border-radius: 14px; border:1px solid var(--stroke)}
-.table{width:100%; border-collapse: collapse; min-width: 980px}
-.table th, .table td{
-  padding:10px 10px;
-  border-bottom:1px solid var(--stroke);
-  text-align:right;
-  vertical-align: middle;
-  font-size:13px;
-}
-.table th{position:sticky; top:0; background: rgba(15,26,46,.95)}
-.num{text-align:left}
-
-.badge{
-  display:inline-block;
-  padding:4px 10px;
-  border-radius: 999px;
-  border:1px solid var(--stroke);
-  background: rgba(255,255,255,.04);
-  font-size:12px;
-  white-space: nowrap;
-}
-
-.rowActions{display:flex; gap:6px; flex-wrap:wrap}
-
-.ledger{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-.ledger input{min-width: 260px}
-.ledgerBox{
-  margin-top:12px;
-  border:1px solid var(--stroke);
-  border-radius:14px;
-  background: rgba(255,255,255,.04);
-  padding:10px;
-  width:100%;
-}
-.ledgerBox .line{
-  display:flex; justify-content:space-between; gap:8px;
-  padding:8px 0;
-  border-bottom:1px dashed rgba(255,255,255,.12)
-}
-.ledgerBox .line:last-child{border-bottom:none}
-.ledgerBox .muted{color:var(--muted)}
-
-/* ✅ Modal */
-.modal{
-  position:fixed; inset:0; z-index:998;
-  display:grid; place-items:center;
-  background: rgba(3,6,18,.72);
-  backdrop-filter: blur(10px);
-  padding:16px;
-}
-.modalCard{
-  width:min(520px, 100%);
-  border:1px solid var(--stroke);
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(15,26,46,.95), rgba(12,22,41,.95));
-  box-shadow: var(--shadow);
-  padding:14px;
-}
-.modalHead{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-.modalHead h3{margin:0; font-size:16px}
-.modalBody{display:grid; gap:10px}
-
-.error{
-  margin-top:10px;
-  padding:10px 12px;
-  border-radius: 14px;
-  border:1px solid rgba(255,80,80,.35);
-  background: rgba(255,80,80,.10);
-  color: #ffd1d1;
-  font-size: 12px;
-}
-
-/* ✅ New PIN screen like screenshot */
-.gate{
-  position:fixed; inset:0; z-index:999;
-  background:
-    radial-gradient(1200px 700px at 60% -10%, rgba(0,140,255,.18), transparent 60%),
-    radial-gradient(900px 650px at 10% 10%, rgba(0,188,212,.14), transparent 55%),
-    rgba(3,6,18,.75);
-  backdrop-filter: blur(12px);
-}
+/* ✅ Center login box */
 .gateShell{
   position:absolute; inset:0;
   display:flex;
-  align-items:flex-end;
+  align-items:center;
   justify-content:center;
   padding:18px;
 }
-.gateCard2{
+
+.gateWrap{
   width:min(720px, 100%);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius: 26px;
-  background: linear-gradient(180deg, rgba(12,20,38,.92), rgba(10,16,30,.92));
-  box-shadow: 0 24px 70px rgba(0,0,0,.55);
-  padding:16px;
-}
-.gateHead2{
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
-}
-.gateAvatar{
-  width:44px; height:44px;
-  border-radius: 16px;
-  display:grid; place-items:center;
-  font-weight:900;
-  background: linear-gradient(135deg, rgba(0,140,255,.95), rgba(0,188,212,.8));
-}
-.gateTitleWrap{flex:1}
-.gateTitle{font-size:20px; font-weight:900; margin-bottom:4px}
-.gateSub{color: rgba(169,183,208,.92); font-size:12px}
-
-.gateForm2{display:grid; gap:10px}
-
-.pinLbl{display:block; color: rgba(169,183,208,.95); font-size:12px}
-
-.pinInputWrap{
-  position:relative;
-  border-radius: 18px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.04);
-}
-.pinInput{
-  width:100%;
-  padding:14px 46px 14px 14px;
-  border:0;
-  outline:0;
-  background: transparent;
-  color: var(--text);
-  border-radius: 18px;
-}
-.pinToggle{
-  position:absolute;
-  left:10px;
-  top:50%;
-  transform:translateY(-50%);
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.03);
-  color: var(--text);
-  border-radius: 14px;
-  padding:8px 10px;
-  cursor:pointer;
-}
-.btnPin{
-  width:max-content;
-  margin-right:auto;
-  padding:12px 18px;
-  border:0;
-  cursor:pointer;
-  border-radius: 18px;
-  color:#fff;
-  font-weight:900;
-  background: linear-gradient(135deg, rgba(0,140,255,.95), rgba(0,188,212,.85));
-}
-.warnLine{
-  margin-top:6px;
-  color: rgba(169,183,208,.9);
-  font-size:12px;
+  flex-direction:column;
+  gap:14px;
+  padding-bottom: 8px;
 }
 
-/* ✅ Footer like screenshot */
-.footer2{
-  padding:24px 14px 34px;
+.gateFooter{
   text-align:center;
-  color:#0f172a;
-  background: rgba(255,255,255,.65);
+  font-size:12px;
+  color: rgba(231,238,252,.90);
 }
-.footer2 .muted2{
+.gateFooterMuted{
   margin-top:6px;
-  color: rgba(15,23,42,.70);
+  color: rgba(169,183,208,.85);
   font-weight:700;
 }
 
-/* ✅ الحل النهائي لمشكلة ظهور الـPIN بعد الدخول */
+/* ✅ NavBar */
+.navBar{
+  display:flex;
+  gap:8px;
+  padding:10px 14px;
+  background: rgba(11,18,32,.85);
+  border-bottom:1px solid var(--stroke);
+  position:sticky;
+  top:64px;
+  z-index:9;
+}
+.navBtn{
+  flex:1;
+  padding:10px;
+  border-radius:14px;
+  border:1px solid var(--stroke);
+  background: rgba(255,255,255,.04);
+  color:var(--text);
+  font-weight:900;
+  cursor:pointer;
+}
+.navBtn.active{
+  background: linear-gradient(135deg, rgba(0,140,255,.9), rgba(0,188,212,.8));
+}
+
+/* ✅ Pages */
+.page{ display:block; }
+.pageHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:12px;
+}
+.pageHead h2{ margin:0; }
+
+/* ✅ Hide fix */
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
