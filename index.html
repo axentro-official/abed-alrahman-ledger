@@ -39,7 +39,7 @@
           </form>
         </div>
 
-        <!-- ✅ Footer داخل اللوجين (رجعناه زي ما كان) -->
+        <!-- ✅ Footer داخل اللوجين (زي ما كان) -->
         <div class="gateFooter">
           <div>© Axentro — All Rights Reserved 2024</div>
           <div class="gateFooterMuted">By Ahmed Hamouda</div>
@@ -251,7 +251,6 @@
         <div class="toolbar">
           <div class="filters">
             <input id="payQ" type="search" placeholder="بحث في المدفوعات بالاسم/ملاحظة..." />
-            <!-- (لو حبيت نشيل أي تصدير هنا كمان قولّي) -->
           </div>
         </div>
 
@@ -283,6 +282,7 @@
         <div class="ledger">
           <input id="ledgerName" type="text" placeholder="اكتب الاسم (جزء من الاسم يكفي)..." />
           <button id="btnLedger" class="btn" type="button">عرض</button>
+          <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
           <div id="ledgerBox" class="ledgerBox"></div>
         </div>
       </div>
@@ -322,9 +322,111 @@
       </div>
     </section>
 
+    <!-- ✅ PAGE: ENTRY PREVIEW -->
+    <section id="page-entryPreview" class="page" hidden>
+      <div class="previewWrap">
+        <div class="previewHead">
+          <h2>معاينة العملية</h2>
+          <div class="previewActions">
+            <button id="btnPrintEntry" class="btn ghost" type="button">طباعة / PDF</button>
+            <button id="btnBackFromEntryPreview" class="btn" type="button">رجوع</button>
+          </div>
+        </div>
+
+        <div class="printCard">
+          <div class="printHeader">
+            <div>
+              <div class="title">سوبر ماركت أولاد يحيى</div>
+              <div class="sub">إدارة هيثم</div>
+              <div class="miniMuted" id="prevEntryMeta">—</div>
+            </div>
+            <div class="miniMuted" id="prevEntryStatus">—</div>
+          </div>
+
+          <div class="kvGrid">
+            <div class="kv"><div class="k">التاريخ</div><div class="v" id="prevDate">—</div></div>
+            <div class="kv"><div class="k">النوع</div><div class="v" id="prevType">—</div></div>
+            <div class="kv"><div class="k">الاسم/الجهة</div><div class="v" id="prevParty">—</div></div>
+            <div class="kv"><div class="k">الوصف</div><div class="v" id="prevDesc">—</div></div>
+            <div class="kv"><div class="k">التصنيف</div><div class="v" id="prevCat">—</div></div>
+            <div class="kv"><div class="k">ملاحظات</div><div class="v" id="prevNotes">—</div></div>
+            <div class="kv"><div class="k">الإجمالي</div><div class="v" id="prevTotal">—</div></div>
+            <div class="kv"><div class="k">مدفوع / باقي</div><div class="v" id="prevPaidRemain">—</div></div>
+          </div>
+
+          <div class="miniMuted" style="margin-top:12px">المدفوعات التابعة:</div>
+          <table class="miniTable" style="margin-top:8px">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody id="prevPaysTbody"></tbody>
+          </table>
+
+          <div class="miniMuted">* للطباعة اختر Print → Save as PDF</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ PAGE: LEDGER PREVIEW -->
+    <section id="page-ledgerPreview" class="page" hidden>
+      <div class="previewWrap">
+        <div class="previewHead">
+          <h2>معاينة كشف الحساب</h2>
+          <div class="previewActions">
+            <button id="btnPrintLedger" class="btn ghost" type="button">طباعة / PDF</button>
+            <button id="btnBackFromLedgerPreview" class="btn" type="button">رجوع</button>
+          </div>
+        </div>
+
+        <div class="printCard">
+          <div class="printHeader">
+            <div>
+              <div class="title">سوبر ماركت أولاد يحيى</div>
+              <div class="sub">إدارة هيثم</div>
+              <div class="miniMuted" id="prevLedgerMeta">—</div>
+            </div>
+            <div class="miniMuted" id="prevLedgerSummary">—</div>
+          </div>
+
+          <div class="miniMuted">تفاصيل العمليات:</div>
+          <table class="miniTable" style="margin-top:8px">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الوصف</th>
+                <th class="num">الإجمالي</th>
+                <th class="num">المدفوع</th>
+                <th class="num">الباقي</th>
+              </tr>
+            </thead>
+            <tbody id="prevLedgerEntriesTbody"></tbody>
+          </table>
+
+          <div class="miniMuted" style="margin-top:12px">تفاصيل المدفوعات:</div>
+          <table class="miniTable" style="margin-top:8px">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody id="prevLedgerPaysTbody"></tbody>
+          </table>
+
+          <div class="miniMuted">* للطباعة اختر Print → Save as PDF</div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <!-- ✅ Footer (رجعناه زي ما كان) -->
+  <!-- ✅ Footer (زي ما كان) -->
   <footer class="footer2">
     <div>© Axentro — All Rights Reserved 2024</div>
     <div class="muted2">By Ahmed Hamouda</div>
