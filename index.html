@@ -8,26 +8,39 @@
 </head>
 
 <body>
-  <!-- ✅ PIN GATE -->
+  <!-- ✅ PIN GATE (Design like screenshot) -->
   <div id="pinGate" class="gate">
-    <div class="gateCard">
-      <div class="gateBrand">
-        <div class="logo">ع</div>
-        <div>
-          <h2>عباد الرحمن</h2>
-          <p>ادخل رقم الـ PIN لفتح الدفتر</p>
+    <div class="gateShell">
+      <div class="gateCard2">
+        <div class="gateHead2">
+          <div class="gateAvatar">ع</div>
+          <div class="gateTitleWrap">
+            <div class="gateTitle">عباد الرحمن</div>
+            <div class="gateSub">Axentro</div>
+          </div>
         </div>
+
+        <form id="pinForm" class="gateForm2">
+          <div class="pinRow">
+            <div class="pinMeta">
+              <label class="pinLbl">PIN</label>
+            </div>
+          </div>
+
+          <div class="pinInputWrap">
+            <input id="pinInput" class="pinInput" type="password" inputmode="numeric"
+                   placeholder="ادخل PIN هنا" maxlength="8" />
+            <button id="pinToggle" class="pinToggle" type="button" aria-label="إظهار/إخفاء PIN">👁</button>
+          </div>
+
+          <div class="help">التعليمات: اكتب الرقم السري ثم اضغط “دخول”.</div>
+
+          <button class="btnPin" type="submit">دخول</button>
+          <div id="pinError" class="error" hidden>PIN غير صحيح.</div>
+
+          <div class="warnLine">⚠️ تنبيه: هذه الصفحة للإدارة فقط وليست للعملاء.</div>
+        </form>
       </div>
-
-      <form id="pinForm" class="gateForm">
-        <label class="lbl">PIN</label>
-        <input id="pinInput" type="password" inputmode="numeric" autocomplete="one-time-code"
-               placeholder="ادخل PIN هنا" maxlength="8" />
-        <div class="help">التعليمات: اكتب الرقم السري ثم اضغط “دخول”.</div>
-
-        <button class="btn primary" type="submit">دخول</button>
-        <div id="pinError" class="error" hidden>PIN غير صحيح.</div>
-      </form>
     </div>
   </div>
 
@@ -241,8 +254,10 @@
     </section>
   </main>
 
-  <footer class="footer">
-    <span>© عباد الرحمن — دفتر الحسابات (بيانات محلية على الجهاز)</span>
+  <!-- ✅ Footer like screenshot -->
+  <footer class="footer2">
+    <div>© Axentro — All Rights Reserved 2024</div>
+    <div class="muted2">By Ahmed Hamouda</div>
   </footer>
 
   <!-- ✅ Modal: Add Payment -->
@@ -263,7 +278,7 @@
         <div class="field">
           <label>المبلغ (جنيه)</label>
           <input id="payAmount" type="number" min="0" step="0.01" placeholder="مثال: 200" />
-          <div class="help">التعليمات: اكتب قيمة الدفعة (سيبها فاضية لو مش هتضيف).</div>
+          <div class="help">التعليمات: اكتب قيمة الدفعة. لو مش هتضيف دفعة سيبها فاضية.</div>
         </div>
 
         <div class="field">
