@@ -399,6 +399,22 @@ input::placeholder{color: rgba(169,183,208,.7)}
   font-weight:700;
 }
 
+/* ✅ NEW: QR تحت الفوتر (عادي + طباعة) */
+.qrFooter{
+  text-align:center;
+  padding: 14px 14px 28px;
+}
+.qrFooter img{
+  width: 140px;
+  max-width: 60vw;
+  height: auto;
+  display: inline-block;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  padding: 10px;
+}
+
 /* ✅ Fix hidden elements */
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
@@ -608,5 +624,22 @@ input::placeholder{color: rgba(169,183,208,.7)}
   /* ✅ لو صفحات المعاينة: خلّيها تملأ الورقة */
   .previewWrap{
     display:block !important;
+  }
+
+  /* ✅ NEW: QR في الطباعة (واضح + بدون خلفية غامقة) */
+  .qrFooter{
+    display:block !important;
+    text-align:center !important;
+    padding: 10mm 0 0 !important;
+    margin-top: 10mm !important;
+    border-top: 1px dashed #e5e7eb !important;
+  }
+  .qrFooter img{
+    width: 38mm !important;         /* مقاس مناسب للطباعة */
+    max-width: 55mm !important;
+    padding: 4mm !important;
+    border: 1px solid #e5e7eb !important;
+    background: #fff !important;
+    border-radius: 6mm !important;
   }
 }
