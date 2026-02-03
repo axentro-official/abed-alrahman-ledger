@@ -12,6 +12,9 @@
       2) PDF: الفوتر + QR يظهروا دائمًا (حتى عند طباعة/بحث شخص واحد)
       3) تفعيل Ledger Preview (كان زر موجود بدون منطق)
       4) التخزين أصبح Google Sheet عبر Apps Script Web App (مع fallback للـ localStorage لو حصل مشكلة)
+      5) ✅ NEW: منع Pop-up alert الخاص بتحميل البيانات (بداله Banner داخل الصفحة)
+      6) ✅ NEW: ربط auth بـ html.authed لمنع وميض الدخول بعد Refresh
+      7) ✅ NEW: منع تكرار QR بعد إضافة printFooter في index.html
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -82,6 +85,63 @@ function sumPaymentsForEntry(entryId, payments, flow = "all"){
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
 }
 
+/* -------------------- ✅ UI Error Banner (بديل alert) -------------------- */
+function ensureGlobalBanner(){
+  if(document.getElementById("globalBanner")) return;
+
+  const box = document.createElement("div");
+  box.id = "globalBanner";
+  box.hidden = true;
+  box.style.position = "fixed";
+  box.style.left = "14px";
+  box.style.right = "14px";
+  box.style.bottom = "14px";
+  box.style.zIndex = "9999";
+  box.style.maxWidth = "900px";
+  box.style.margin = "0 auto";
+
+  // نفس شكل .error عندك + زر
+  box.innerHTML = `
+    <div class="error" style="display:flex; gap:10px; align-items:flex-start; justify-content:space-between;">
+      <div style="flex:1">
+        <div id="globalBannerText" style="font-weight:900; margin-bottom:6px;">—</div>
+        <div style="opacity:.9; font-size:12px">لو المشكلة مستمرة: راجع نشر الـ Web App أو جرّب بعد دقيقة.</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="globalBannerRetry" class="btn small" type="button">إعادة المحاولة</button>
+        <button id="globalBannerClose" class="btn small ghost" type="button">إغلاق</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(box);
+
+  const btnClose = document.getElementById("globalBannerClose");
+  const btnRetry = document.getElementById("globalBannerRetry");
+  btnClose?.addEventListener("click", ()=> hideGlobalError());
+  btnRetry?.addEventListener("click", async ()=>{
+    hideGlobalError();
+    if(isAuthed()){
+      try{
+        await STORE.init();
+      }catch(_e){}
+      await refresh();
+    }
+  });
+}
+
+function showGlobalError(msg){
+  ensureGlobalBanner();
+  const banner = document.getElementById("globalBanner");
+  const t = document.getElementById("globalBannerText");
+  if(t) t.textContent = msg || "حدث خطأ غير متوقع.";
+  if(banner) banner.hidden = false;
+}
+
+function hideGlobalError(){
+  const banner = document.getElementById("globalBanner");
+  if(banner) banner.hidden = true;
+}
+
 /* -------------------- Pages -------------------- */
 const PAGES = [
   "dashboard","records","payments","ledger",
@@ -108,8 +168,14 @@ function showPage(name){
 
 /* -------------------- Auth -------------------- */
 function setAuthed(v){
-  if(v) sessionStorage.setItem(AUTH_KEY, "1");
-  else sessionStorage.removeItem(AUTH_KEY);
+  // ✅ sessionStorage + ✅ html class (منع الوميض)
+  if(v){
+    sessionStorage.setItem(AUTH_KEY, "1");
+    document.documentElement.classList.add("authed");
+  }else{
+    sessionStorage.removeItem(AUTH_KEY);
+    document.documentElement.classList.remove("authed");
+  }
 }
 function isAuthed(){
   return sessionStorage.getItem(AUTH_KEY) === "1";
@@ -169,6 +235,8 @@ function setupPinGate(){
   if(pinForm && pinInput){
     pinForm.addEventListener("submit", async (ev)=>{
       ev.preventDefault();
+      hideGlobalError();
+
       const v = (pinInput.value || "").trim();
 
       if(v === PIN_CODE){
@@ -177,9 +245,18 @@ function setupPinGate(){
         pinInput.value = "";
         pinInput.type = "password";
 
-        // ✅ تأكد من تجهيز الشيت (مرة واحدة)
-        await STORE.init();
+        // ✅ افتح التطبيق فورًا لتفادي الوميض ثم جهز/حمّل
         openApp();
+
+        try{
+          await STORE.init();
+        }catch(e){
+          console.error(e);
+          showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
+        }
+
+        await refresh();
+
       } else {
         if(pinError) pinError.hidden = false;
         pinInput.focus();
@@ -194,6 +271,7 @@ function requirePin(actionText = "تنفيذ العملية"){
   const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
   if(v === null) return false;
   if((v || "").trim() !== PIN_CODE){
+    // نتركها alert هنا لأنها إجراء حساس ومقصود
     alert("PIN غير صحيح.");
     return false;
   }
@@ -256,11 +334,6 @@ function validateEntry(entry){
 }
 
 /* -------------------- ✅ الحساب الصحيح للمدفوع/الباقي -------------------- */
-/*
-  - مصروف: paid=0 / remaining=0
-  - فلوس ليا (receivable): الدفعات المؤثرة = IN
-  - فلوس عليا (payable):   الدفعات المؤثرة = OUT
-*/
 function computeEntryView(entry, payments){
   const total = Number(entry.total);
   const side = moneySide(entry.type);
@@ -298,7 +371,6 @@ async function apiCall(action, payload = {}){
   const url = API_CFG.scriptUrl;
   const pin = String(API_CFG.pin || PIN_CODE);
 
-  // نحاول POST أولاً
   try{
     const r = await fetch(url, {
       method: "POST",
@@ -309,7 +381,6 @@ async function apiCall(action, payload = {}){
     if(!j || j.ok === false) throw new Error(j?.error || "API_ERROR");
     return j;
   }catch(_e){
-    // fallback GET
     const qs = new URLSearchParams();
     qs.set("action", action);
     qs.set("pin", pin);
@@ -344,35 +415,38 @@ class LocalStore {
       return { entries: [], payments: [], trash: [] };
     }
   }
+  async setAll(entries, payments, trashLogs){
+    localStorage.setItem(LS_KEY, JSON.stringify({ entries, payments }));
+    localStorage.setItem(TRASH_KEY, JSON.stringify({ logs: (trashLogs || []).slice(0, MAX_TRASH) }));
+  }
   async addEntry(entry){
     const all = await this.getAll();
     all.entries.push(entry);
-    localStorage.setItem(LS_KEY, JSON.stringify({ entries: all.entries, payments: all.payments }));
+    await this.setAll(all.entries, all.payments, all.trash);
   }
   async addPayment(payment){
     const all = await this.getAll();
     all.payments.push(payment);
-    localStorage.setItem(LS_KEY, JSON.stringify({ entries: all.entries, payments: all.payments }));
+    await this.setAll(all.entries, all.payments, all.trash);
   }
   async deleteEntry(entryId, snapshot){
     const all = await this.getAll();
     all.entries = all.entries.filter(e => e.id !== entryId);
     all.payments = all.payments.filter(p => p.entryId !== entryId);
-    localStorage.setItem(LS_KEY, JSON.stringify({ entries: all.entries, payments: all.payments }));
 
-    // trash
     const logs = (all.trash || []);
     logs.unshift({ id: uid(), at: Date.now(), type:"delete_entry", ...snapshot });
-    localStorage.setItem(TRASH_KEY, JSON.stringify({ logs: logs.slice(0, MAX_TRASH) }));
+
+    await this.setAll(all.entries, all.payments, logs);
   }
   async deletePayment(payId, snapshot){
     const all = await this.getAll();
     all.payments = all.payments.filter(p => p.id !== payId);
-    localStorage.setItem(LS_KEY, JSON.stringify({ entries: all.entries, payments: all.payments }));
 
     const logs = (all.trash || []);
     logs.unshift({ id: uid(), at: Date.now(), type:"delete_payment", ...snapshot });
-    localStorage.setItem(TRASH_KEY, JSON.stringify({ logs: logs.slice(0, MAX_TRASH) }));
+
+    await this.setAll(all.entries, all.payments, logs);
   }
   async getTrash(){
     const all = await this.getAll();
@@ -388,7 +462,6 @@ class LocalStore {
 
 class SheetsStore {
   async init(){
-    // ينشئ الشيت لو مش موجودة
     await apiCall(API_ACTIONS.init, {});
     return true;
   }
@@ -400,29 +473,146 @@ class SheetsStore {
       trash: Array.isArray(j.trash) ? j.trash : []
     };
   }
-  async addEntry(entry){
-    await apiCall(API_ACTIONS.addEntry, { entry });
-  }
-  async addPayment(payment){
-    await apiCall(API_ACTIONS.addPayment, { payment });
-  }
-  async deleteEntry(entryId, snapshot){
-    await apiCall(API_ACTIONS.deleteEntry, { entryId, snapshot });
-  }
-  async deletePayment(payId, snapshot){
-    await apiCall(API_ACTIONS.deletePayment, { payId, snapshot });
-  }
+  async addEntry(entry){ await apiCall(API_ACTIONS.addEntry, { entry }); }
+  async addPayment(payment){ await apiCall(API_ACTIONS.addPayment, { payment }); }
+  async deleteEntry(entryId, snapshot){ await apiCall(API_ACTIONS.deleteEntry, { entryId, snapshot }); }
+  async deletePayment(payId, snapshot){ await apiCall(API_ACTIONS.deletePayment, { payId, snapshot }); }
   async getTrash(){
     const j = await apiCall(API_ACTIONS.getTrash, {});
     return Array.isArray(j.trash) ? j.trash : [];
   }
+  async deleteTrashLog(logId){ await apiCall(API_ACTIONS.deleteTrashLog, { logId }); }
+}
+
+/* ✅ Hybrid: Sheets + fallback Local */
+class HybridStore {
+  constructor(){
+    this.local = new LocalStore();
+    this.sheets = new SheetsStore();
+    this.mode = (API_CFG?.scriptUrl) ? "sheets" : "local";
+  }
+
+  async init(){
+    await this.local.init();
+    if(this.mode === "local") return true;
+
+    try{
+      await this.sheets.init();
+      this.mode = "sheets";
+      return true;
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      throw e;
+    }
+  }
+
+  async getAll(){
+    if(this.mode === "local"){
+      return await this.local.getAll();
+    }
+
+    try{
+      const all = await this.sheets.getAll();
+
+      // ✅ cache locally
+      const payments = (all.payments || []).map(p => ({
+        ...p,
+        flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
+      }));
+      await this.local.setAll(all.entries || [], payments, all.trash || []);
+      return { entries: all.entries || [], payments, trash: all.trash || [] };
+
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      // fallback local
+      return await this.local.getAll();
+    }
+  }
+
+  async addEntry(entry){
+    if(this.mode === "local"){
+      return await this.local.addEntry(entry);
+    }
+    try{
+      await this.sheets.addEntry(entry);
+      await this.local.addEntry(entry); // cache
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      await this.local.addEntry(entry);
+      throw e;
+    }
+  }
+
+  async addPayment(payment){
+    if(this.mode === "local"){
+      return await this.local.addPayment(payment);
+    }
+    try{
+      await this.sheets.addPayment(payment);
+      await this.local.addPayment(payment);
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      await this.local.addPayment(payment);
+      throw e;
+    }
+  }
+
+  async deleteEntry(entryId, snapshot){
+    if(this.mode === "local"){
+      return await this.local.deleteEntry(entryId, snapshot);
+    }
+    try{
+      await this.sheets.deleteEntry(entryId, snapshot);
+      await this.local.deleteEntry(entryId, snapshot);
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      await this.local.deleteEntry(entryId, snapshot);
+      throw e;
+    }
+  }
+
+  async deletePayment(payId, snapshot){
+    if(this.mode === "local"){
+      return await this.local.deletePayment(payId, snapshot);
+    }
+    try{
+      await this.sheets.deletePayment(payId, snapshot);
+      await this.local.deletePayment(payId, snapshot);
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      await this.local.deletePayment(payId, snapshot);
+      throw e;
+    }
+  }
+
+  async getTrash(){
+    const all = await this.getAll();
+    return all.trash || [];
+  }
+
   async deleteTrashLog(logId){
-    await apiCall(API_ACTIONS.deleteTrashLog, { logId });
+    if(this.mode === "local"){
+      return await this.local.deleteTrashLog(logId);
+    }
+    try{
+      await this.sheets.deleteTrashLog(logId);
+      await this.local.deleteTrashLog(logId);
+    }catch(e){
+      console.error(e);
+      this.mode = "local";
+      await this.local.deleteTrashLog(logId);
+      throw e;
+    }
   }
 }
 
-// ✅ اختر store: لو فيه scriptUrl استخدم Sheets، وإلا fallback local
-const STORE = (API_CFG?.scriptUrl) ? new SheetsStore() : new LocalStore();
+const STORE = new HybridStore();
 
 /* -------------------- Global Cache -------------------- */
 const STATE = {
@@ -437,7 +627,6 @@ function computeTotals(entriesView, payments){
     .filter(e => e.type === "expense")
     .reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
 
-  // إجمالي المدفوعات الخارجة / الداخلة
   const paidOutTotal = payments
     .filter(p => (p.flow || "out") === "out")
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
@@ -461,7 +650,6 @@ function renderKPIs(entriesView, payments){
   const t = computeTotals(entriesView, payments);
 
   el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(t.expensesTotal));
-  // ✅ زي ما UI عندك مكتوب "إجمالي المدفوعات" (نعتبرها خارجة)
   el("kpiPaid") && (el("kpiPaid").textContent = fmt(t.paidOutTotal));
 
   el("kpiReceivable") && (el("kpiReceivable").textContent = fmt(t.remainingReceivable));
@@ -628,55 +816,20 @@ function closePayModal(){
   CURRENT_PAY_ENTRY_ID = null;
 }
 
-/* -------------------- ✅ Print Footer Injector (حل PDF نهائي) -------------------- */
-let __printFooterInjected = false;
-
-function ensurePrintFooterInside(cardEl){
-  if(!cardEl) return;
-  if(cardEl.querySelector(".__printFooterInjected")) return;
-
-  const wrap = document.createElement("div");
-  wrap.className = "__printFooterInjected";
-  wrap.style.marginTop = "14px";
-  wrap.style.paddingTop = "10px";
-  wrap.style.borderTop = "1px solid rgba(0,0,0,.12)";
-  wrap.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-      <div style="font-size:12px; opacity:.85;">
-        © Axentro — All Rights Reserved 2024<br/>
-        <span style="opacity:.75;">By Ahmed Hamouda</span>
-      </div>
-      <div style="text-align:center;">
-        <img src="images/qr.png" alt="QR" style="width:110px; height:auto; max-width:40vw; display:inline-block;" />
-      </div>
-    </div>
-  `;
-  cardEl.appendChild(wrap);
+/* -------------------- ✅ Print Footer (منع التكرار) -------------------- */
+/*
+  - لو index.html فيه .printFooter => نعتمد عليه فقط
+  - ممنوع حقن QR داخل الكروت حتى لا يتكرر
+*/
+function cleanupLegacyInjectedFooters(){
+  document.querySelectorAll(".__printFooterInjected").forEach(n => n.remove());
 }
 
+// لو حد لسه بينادي preparePrintForCurrentPage من مكان تاني: نخليه آمن
 function preparePrintForCurrentPage(){
-  // ندعم كل صفحات المعاينة + التقارير
-  const entryPage = document.getElementById("page-entryPreview");
-  const ledgerPage = document.getElementById("page-ledgerPreview");
-  const reportsPage = document.getElementById("page-reports");
-
-  // لو داخل معاينة عملية
-  if(entryPage && !entryPage.hidden){
-    ensurePrintFooterInside(entryPage.querySelector(".printCard"));
-    __printFooterInjected = true;
-  }
-  // لو داخل معاينة كشف حساب
-  if(ledgerPage && !ledgerPage.hidden){
-    ensurePrintFooterInside(ledgerPage.querySelector(".printCard"));
-    __printFooterInjected = true;
-  }
-  // لو داخل تقارير (نضيف footer في آخر الكارد)
-  if(reportsPage && !reportsPage.hidden){
-    ensurePrintFooterInside(reportsPage.querySelector(".card"));
-    __printFooterInjected = true;
-  }
+  // ✅ فقط تنظيف أي footers قديمة
+  cleanupLegacyInjectedFooters();
 }
-
 window.addEventListener("beforeprint", preparePrintForCurrentPage);
 
 /* -------------------- Preview: Entry -------------------- */
@@ -713,7 +866,6 @@ function openEntryPreview(entryId){
     if(v.type === "expense"){
       tb.innerHTML = `<tr><td colspan="3">المصروف لا يحتوي على مدفوعات.</td></tr>`;
     } else {
-      // ✅ نعرض كل المدفوعات (in/out) للشفافية
       const pays = STATE.payments
         .filter(p => p.entryId === entryId)
         .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
@@ -778,7 +930,7 @@ function showLedger(name){
   const pays = paysAll
     .filter(p => (p.party || "").trim().toLowerCase().includes(q))
     .filter(p => allowedEntryIds.has(p.entryId))
-    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
   if(entries.length === 0 && pays.length === 0){
     box.innerHTML = `<div class="muted">لا توجد بيانات مطابقة.</div>`;
@@ -881,7 +1033,7 @@ function openLedgerPreview(){
   const pays = paysAll
     .filter(p => (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(p => allowedEntryIds.has(p.entryId))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - a.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt)); // ✅ FIX
 
   const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
   const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
@@ -1175,9 +1327,10 @@ async function refresh(){
   __refreshLock = true;
 
   try{
+    hideGlobalError();
+
     const all = await STORE.getAll();
 
-    // ✅ Normalize flows
     const payments = (all.payments || []).map(p => ({
       ...p,
       flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
@@ -1199,9 +1352,20 @@ async function refresh(){
     const reportsPage = document.getElementById("page-reports");
     if(reportsPage && !reportsPage.hidden) renderReports();
 
+    // ✅ لو كان في مشكلة قديمة انتهت: نخفي البانر
+    hideGlobalError();
+
   }catch(e){
     console.error(e);
-    alert("حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اعمل Refresh.");
+
+    // ✅ بدل Pop-up alert
+    // نفصل رسالة واضحة حسب الوضع
+    const msg =
+      (STORE.mode === "local")
+        ? "تعذر تحميل البيانات من الشيت. جاري استخدام التخزين المحلي مؤقتًا."
+        : "حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اضغط إعادة المحاولة.";
+
+    showGlobalError(msg);
   }finally{
     __refreshLock = false;
   }
@@ -1210,12 +1374,25 @@ async function refresh(){
 /* -------------------- DOM Events -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   try{
+    ensureGlobalBanner();
     setupPinGate();
 
-    // ✅ تجهيز الشيت مبكرًا لو المستخدم كان authed
+    // ✅ مزامنة class لو المستخدم authed
     if(isAuthed()){
-      await STORE.init();
+      document.documentElement.classList.add("authed");
+
+      // افتح التطبيق فورًا لتجنب الوميض
       openApp();
+
+      // ثم حاول init/refresh
+      try{
+        await STORE.init();
+      }catch(e){
+        console.error(e);
+        showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
+      }
+
+      await refresh();
     }
 
     document.querySelectorAll(".navBtn").forEach(btn=>{
@@ -1240,7 +1417,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    // ✅ firstPay: لو المستخدم كتب 0 يمسحه + لو اختار مصروف نخليه فاضي
     el("firstPay")?.addEventListener("input", ()=>{
       const v = el("firstPay").value;
       if(v !== "" && Number(v) <= 0) el("firstPay").value = "";
@@ -1253,6 +1429,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // ✅ Add Entry
     el("entryForm")?.addEventListener("submit", async (ev)=>{
       ev.preventDefault();
+      hideGlobalError();
 
       const { entry, firstPay } = getEntryFromForm();
       const err = validateEntry(entry);
@@ -1268,29 +1445,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
 
-      await STORE.addEntry(entry);
+      try{
+        await STORE.addEntry(entry);
 
-      // ✅ دفعة أولى:
-      // - لو العملية receivable (فلوس ليا) فالأصح إنها "IN" (اتدفعتلي)
-      // - لو العملية payable (فلوس عليا) فالأصح إنها "OUT" (أنا دفعت)
-      if(firstPay !== null && entry.type !== "expense"){
-        const side = moneySide(entry.type);
-        const flow = (side === "receivable") ? "in" : "out";
+        if(firstPay !== null && entry.type !== "expense"){
+          const side = moneySide(entry.type);
+          const flow = (side === "receivable") ? "in" : "out";
 
-        await STORE.addPayment({
-          id: uid(),
-          entryId: entry.id,
-          date: entry.date,
-          party: entry.party,
-          amount: firstPay,
-          note: "دفعة أولى",
-          flow,
-          createdAt: Date.now()
-        });
+          await STORE.addPayment({
+            id: uid(),
+            entryId: entry.id,
+            date: entry.date,
+            party: entry.party,
+            amount: firstPay,
+            note: "دفعة أولى",
+            flow,
+            createdAt: Date.now()
+          });
+        }
+
+        resetForm();
+        await refresh();
+
+      }catch(e){
+        console.error(e);
+        showGlobalError("تعذر حفظ العملية على الشيت. تم الحفظ محليًا إذا كان الوضع Offline.");
       }
-
-      resetForm();
-      await refresh();
     });
 
     el("btnReset")?.addEventListener("click", resetForm);
@@ -1332,25 +1512,23 @@ document.addEventListener("DOMContentLoaded", async () => {
           const entry = STATE.entries.find(e => e.id === id) || null;
           const pays = STATE.payments.filter(p => p.entryId === id);
 
-          await STORE.deleteEntry(id, {
-            entrySnapshot: entry,
-            paymentsSnapshot: pays
-          });
+          try{
+            await STORE.deleteEntry(id, {
+              entrySnapshot: entry,
+              paymentsSnapshot: pays
+            });
+          }catch(e){
+            console.error(e);
+            showGlobalError("تعذر الحذف على الشيت. تم تنفيذ الحذف محليًا إذا كان الوضع Offline.");
+          }
 
           await refresh();
         }
         return;
       }
 
-      if(act === "pay"){
-        openPayModal(id);
-        return;
-      }
-
-      if(act === "preview"){
-        openEntryPreview(id);
-        return;
-      }
+      if(act === "pay"){ openPayModal(id); return; }
+      if(act === "preview"){ openEntryPreview(id); return; }
 
       if(act === "person"){
         const name = btn.dataset.name || "";
@@ -1382,7 +1560,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if(ev.target === el("payModal")) closePayModal();
     });
 
-    // ✅ Save payment (منع تجاوز الإجمالي حسب نوع العملية)
+    // ✅ Save payment
     el("paySave")?.addEventListener("click", async ()=>{
       const entry = STATE.entries.find(e => e.id === CURRENT_PAY_ENTRY_ID);
       if(!entry) return closePayModal();
@@ -1402,7 +1580,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // ✅ منع تجاوز الإجمالي للدفعات المؤثرة فقط
       const side = moneySide(entry.type);
       const affectingFlow = (side === "receivable") ? "in" : "out";
 
@@ -1414,16 +1591,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
 
-      await STORE.addPayment({
-        id: uid(),
-        entryId: entry.id,
-        date,
-        party: entry.party,
-        amount,
-        note,
-        flow: (flow === "in" ? "in" : "out"),
-        createdAt: Date.now()
-      });
+      try{
+        await STORE.addPayment({
+          id: uid(),
+          entryId: entry.id,
+          date,
+          party: entry.party,
+          amount,
+          note,
+          flow: (flow === "in" ? "in" : "out"),
+          createdAt: Date.now()
+        });
+      }catch(e){
+        console.error(e);
+        showGlobalError("تعذر حفظ الدفعة على الشيت. تم الحفظ محليًا إذا كان الوضع Offline.");
+      }
 
       closePayModal();
       await refresh();
@@ -1440,9 +1622,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       if(confirm("متأكد حذف الدفعة؟")){
         const pay = STATE.payments.find(p => p.id === payId) || null;
 
-        await STORE.deletePayment(payId, {
-          paymentSnapshot: pay
-        });
+        try{
+          await STORE.deletePayment(payId, {
+            paymentSnapshot: pay
+          });
+        }catch(e){
+          console.error(e);
+          showGlobalError("تعذر حذف الدفعة على الشيت. تم تنفيذ الحذف محليًا إذا كان الوضع Offline.");
+        }
 
         await refresh();
       }
@@ -1457,9 +1644,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if(!requirePin("الحذف النهائي من سجل المحذوفات")) return;
       if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
-        await STORE.deleteTrashLog(logId);
-        STATE.trash = await STORE.getTrash();
-        renderTrash();
+        try{
+          await STORE.deleteTrashLog(logId);
+          STATE.trash = await STORE.getTrash();
+          renderTrash();
+        }catch(e){
+          console.error(e);
+          showGlobalError("تعذر حذف السطر من الشيت. تم الحذف محليًا إذا كان الوضع Offline.");
+        }
       }
     });
 
@@ -1477,13 +1669,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       showLedger(el("ledgerName")?.value || "");
     });
 
-    // أول تحميل بعد الدخول
-    if(isAuthed()){
-      await refresh();
-    }
-
   }catch(e){
-    alert("فيه خطأ حصل في تشغيل الصفحة. امسح كاش الموقع وافتح تاني.");
     console.error(e);
+    // بدل alert عام:
+    showGlobalError("فيه خطأ حصل في تشغيل الصفحة. جرّب تحديث الصفحة أو امسح كاش الموقع.");
   }
 });
