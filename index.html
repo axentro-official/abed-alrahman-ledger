@@ -17,7 +17,7 @@
     })();
   </script>
 
-  <!-- ✅ Auth-driven visibility + Print footer fix (بدون تعديل style.css) -->
+  <!-- ✅ Auth-driven visibility + Print elements -->
   <style>
     /* منع وميض الدخول عند Refresh */
     html:not(.authed) #navBar,
@@ -29,41 +29,27 @@
     html.authed #navBar { display: flex !important; }
     html.authed #appRoot { display: block !important; }
 
-    /* Print footer (فوتر + QR مرة واحدة) */
-    .printFooter { display: none; }
+    /* Print-only blocks default hidden */
+    .printOnly { display: none; }
 
     @media print {
-      /* اخفاء النسخ اللي بتتكرر في الطباعة */
-      body .footer2 { display: none !important; }
-      body .qrFooter { display: none !important; }
+      /* إخفاء عناصر واجهة التطبيق */
+      body .topbar,
+      body .navBar,
+      body .footer2,
+      body .qrFooter,
+      body #pinGate,
+      body #payModal,
+      body #pinConfirmModal,
+      body .actions,
+      body .filters,
+      body .toolbar,
+      body .pageHead,
+      body .previewActions,
+      body .btn { display: none !important; }
 
-      /* اظهار فوتر الطباعة الموحد */
-      .printFooter {
-        display: block !important;
-        text-align: center !important;
-        padding: 10mm 0 0 !important;
-        margin-top: 10mm !important;
-        border-top: 1px dashed #e5e7eb !important;
-        color: #0f172a !important;
-      }
-      .printFooter .pfMeta {
-        font-size: 10pt !important;
-        margin: 0 !important;
-      }
-      .printFooter .pfMeta .muted {
-        opacity: .75 !important;
-      }
-      .printFooter img {
-        width: 38mm !important;
-        max-width: 55mm !important;
-        height: auto !important;
-        display: inline-block !important;
-        padding: 4mm !important;
-        border: 1px solid #e5e7eb !important;
-        background: #fff !important;
-        border-radius: 6mm !important;
-        margin-top: 6mm !important;
-      }
+      /* إظهار عناصر الطباعة */
+      .printOnly { display: block !important; }
     }
   </style>
 </head>
@@ -129,7 +115,6 @@
   </header>
 
   <!-- ✅ NAV (Tabs) -->
-  <!-- ⚠️ تم إزالة hidden لمنع تعارضه مع CSS أثناء authed -->
   <nav class="navBar" id="navBar">
     <button class="navBtn active" data-page="dashboard">🏠 الرئيسية</button>
     <button class="navBtn" data-page="records">📒 السجل</button>
@@ -139,8 +124,23 @@
     <button class="navBtn" data-page="trash">🗑️ المحذوفات</button>
   </nav>
 
-  <!-- ⚠️ تم إزالة hidden لمنع تعارضه مع CSS أثناء authed -->
   <main class="container" id="appRoot">
+
+    <!-- ✅ PRINT HEADER (يظهر في الطباعة فقط) -->
+    <section class="printOnly">
+      <div class="printCard">
+        <div class="printHeader">
+          <div>
+            <div class="title">سوبر ماركت أولاد يحيى — دفتر الحسابات</div>
+            <div class="sub">إدارة هيثم • تاريخ الطباعة: <span id="printNow">—</span></div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <!-- ✅ اختياري: لوجو -->
+            <img src="images/logo.png" alt="Logo" style="width:64px; height:auto; display:none" id="printLogo" />
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- ✅ PAGE: DASHBOARD -->
     <section id="page-dashboard" class="page">
@@ -270,14 +270,9 @@
       </div>
     </section>
 
-    <!-- ✅ باقي الصفحات (كما هي) -->
-    <!-- ... (نفس كودك بدون تغيير) ... -->
-
     <!-- ✅ PAGE: RECORDS -->
     <section id="page-records" class="page" hidden>
-      <div class="pageHead">
-        <h2>السجل</h2>
-      </div>
+      <div class="pageHead"><h2>السجل</h2></div>
 
       <div class="card">
         <div class="toolbar">
@@ -321,9 +316,7 @@
 
     <!-- ✅ PAGE: PAYMENTS -->
     <section id="page-payments" class="page" hidden>
-      <div class="pageHead">
-        <h2>سجل المدفوعات</h2>
-      </div>
+      <div class="pageHead"><h2>سجل المدفوعات</h2></div>
 
       <div class="card">
         <div class="toolbar">
@@ -352,9 +345,7 @@
 
     <!-- ✅ PAGE: LEDGER -->
     <section id="page-ledger" class="page" hidden>
-      <div class="pageHead">
-        <h2>كشف حساب</h2>
-      </div>
+      <div class="pageHead"><h2>كشف حساب</h2></div>
 
       <div class="card">
         <div class="ledger">
@@ -367,16 +358,19 @@
           <input id="ledgerName" type="text" placeholder="اكتب الاسم (جزء من الاسم يكفي)..." />
           <button id="btnLedger" class="btn" type="button">عرض</button>
           <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
-          <div id="ledgerBox" class="ledgerBox"></div>
         </div>
+
+        <div id="ledgerBox" class="ledgerBox"></div>
+
+        <p class="hint" style="margin-top:10px">
+          تلميح: اكتب جزء من الاسم (مثال: “احم”) هيظهر كل اللي الاسم بتاعه يحتوي عليها.
+        </p>
       </div>
     </section>
 
     <!-- ✅ PAGE: REPORTS -->
     <section id="page-reports" class="page" hidden>
-      <div class="pageHead">
-        <h2>التقارير</h2>
-      </div>
+      <div class="pageHead"><h2>التقارير</h2></div>
 
       <div class="card">
         <div class="toolbar">
@@ -410,40 +404,19 @@
           </div>
         </div>
 
-        <p class="hint" style="margin-top:10px">
-          ملحوظة: “مدفوعات خارجة / متحصلات داخلة” هتشتغل بعد ما نعدّل `app.js` ونضيف نوع الحركة داخل المدفوعات (Out/In).
-        </p>
-
         <div class="kpis" style="margin-top:12px">
-          <div class="kpi">
-            <span class="label">إجمالي العمليات داخل الفترة</span>
-            <span id="repKpiEntries" class="value">—</span>
-          </div>
-          <div class="kpi">
-            <span class="label">إجمالي المدفوعات داخل الفترة</span>
-            <span id="repKpiPays" class="value">—</span>
-          </div>
-          <div class="kpi">
-            <span class="label">إجمالي (فلوس ليا) داخل الفترة</span>
-            <span id="repKpiReceivable" class="value">—</span>
-          </div>
-          <div class="kpi">
-            <span class="label">إجمالي (فلوس عليا) داخل الفترة</span>
-            <span id="repKpiPayable" class="value">—</span>
-          </div>
+          <div class="kpi"><span class="label">إجمالي العمليات داخل الفترة</span><span id="repKpiEntries" class="value">—</span></div>
+          <div class="kpi"><span class="label">إجمالي المدفوعات داخل الفترة</span><span id="repKpiPays" class="value">—</span></div>
+          <div class="kpi"><span class="label">إجمالي (فلوس ليا) داخل الفترة</span><span id="repKpiReceivable" class="value">—</span></div>
+          <div class="kpi"><span class="label">إجمالي (فلوس عليا) داخل الفترة</span><span id="repKpiPayable" class="value">—</span></div>
         </div>
 
         <div class="tableWrap" style="margin-top:12px">
           <table class="table">
             <thead>
               <tr>
-                <th>التاريخ</th>
-                <th>النوع</th>
-                <th>الاسم/الجهة</th>
-                <th>الوصف</th>
-                <th class="num">الإجمالي</th>
-                <th class="num">المدفوع</th>
-                <th class="num">الباقي</th>
+                <th>التاريخ</th><th>النوع</th><th>الاسم/الجهة</th><th>الوصف</th>
+                <th class="num">الإجمالي</th><th class="num">المدفوع</th><th class="num">الباقي</th>
               </tr>
             </thead>
             <tbody id="repEntriesTbody"></tbody>
@@ -453,12 +426,7 @@
         <div class="tableWrap" style="margin-top:12px">
           <table class="table">
             <thead>
-              <tr>
-                <th>تاريخ الدفع</th>
-                <th>الاسم/الجهة</th>
-                <th>ملاحظة</th>
-                <th class="num">المبلغ</th>
-              </tr>
+              <tr><th>تاريخ الدفع</th><th>الاسم/الجهة</th><th>ملاحظة</th><th class="num">المبلغ</th></tr>
             </thead>
             <tbody id="repPaysTbody"></tbody>
           </table>
@@ -468,9 +436,7 @@
 
     <!-- ✅ PAGE: TRASH -->
     <section id="page-trash" class="page" hidden>
-      <div class="pageHead">
-        <h2>سجل المحذوفات</h2>
-      </div>
+      <div class="pageHead"><h2>سجل المحذوفات</h2></div>
 
       <div class="card">
         <div class="toolbar">
@@ -482,14 +448,7 @@
         <div class="tableWrap">
           <table class="table">
             <thead>
-              <tr>
-                <th>وقت الحذف</th>
-                <th>النوع</th>
-                <th>الاسم/الجهة</th>
-                <th class="num">المبلغ</th>
-                <th>سبب</th>
-                <th>إجراء</th>
-              </tr>
+              <tr><th>وقت الحذف</th><th>النوع</th><th>الاسم/الجهة</th><th class="num">المبلغ</th><th>سبب</th><th>إجراء</th></tr>
             </thead>
             <tbody id="trashTbody"></tbody>
           </table>
@@ -497,16 +456,103 @@
       </div>
     </section>
 
-    <!-- ✅ PAGE: ENTRY PREVIEW -->
+    <!-- ✅ PAGE: ENTRY PREVIEW (مطلوبة علشان زر معاينة يشتغل) -->
     <section id="page-entryPreview" class="page" hidden>
-      <!-- نفس كودك -->
-      <!-- ... -->
+      <div class="pageHead">
+        <h2>معاينة عملية</h2>
+      </div>
+
+      <div class="card previewWrap">
+        <div class="previewHead">
+          <div>
+            <div class="hint" id="prevEntryMeta">—</div>
+            <div style="font-weight:900" id="prevEntryStatus">—</div>
+          </div>
+          <div class="previewActions">
+            <button id="btnBackFromEntryPreview" class="btn" type="button">رجوع</button>
+            <button id="btnPrintEntry" class="btn ghost" type="button">طباعة / PDF</button>
+          </div>
+        </div>
+
+        <div class="printCard">
+          <div class="kvGrid">
+            <div class="kv"><div class="k">التاريخ</div><div class="v" id="prevDate">—</div></div>
+            <div class="kv"><div class="k">النوع</div><div class="v" id="prevType">—</div></div>
+            <div class="kv"><div class="k">الاسم/الجهة</div><div class="v" id="prevParty">—</div></div>
+            <div class="kv"><div class="k">الوصف</div><div class="v" id="prevDesc">—</div></div>
+            <div class="kv"><div class="k">تصنيف</div><div class="v" id="prevCat">—</div></div>
+            <div class="kv"><div class="k">ملاحظات</div><div class="v" id="prevNotes">—</div></div>
+            <div class="kv"><div class="k">الإجمالي</div><div class="v" id="prevTotal">—</div></div>
+            <div class="kv"><div class="k">مدفوع / باقي</div><div class="v" id="prevPaidRemain">—</div></div>
+          </div>
+
+          <div style="margin-top:12px; font-weight:900">المدفوعات التابعة</div>
+          <table class="miniTable" style="margin-top:10px">
+            <thead>
+              <tr><th>تاريخ</th><th>تفاصيل</th><th class="num">المبلغ</th></tr>
+            </thead>
+            <tbody id="prevPaysTbody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
-    <!-- ✅ PAGE: LEDGER PREVIEW -->
+    <!-- ✅ PAGE: LEDGER PREVIEW (مطلوبة علشان زر معاينة كشف الحساب يشتغل) -->
     <section id="page-ledgerPreview" class="page" hidden>
-      <!-- نفس كودك -->
-      <!-- ... -->
+      <div class="pageHead">
+        <h2>معاينة كشف حساب</h2>
+      </div>
+
+      <div class="card previewWrap">
+        <div class="previewHead">
+          <div>
+            <div class="hint" id="prevLedgerMeta">—</div>
+            <div style="font-weight:900" id="prevLedgerSummary">—</div>
+          </div>
+          <div class="previewActions">
+            <button id="btnBackFromLedgerPreview" class="btn" type="button">رجوع</button>
+            <button id="btnPrintLedger" class="btn ghost" type="button">طباعة / PDF</button>
+          </div>
+        </div>
+
+        <div class="printCard">
+          <div style="font-weight:900; margin-bottom:8px">العمليات</div>
+          <table class="miniTable">
+            <thead>
+              <tr>
+                <th>التاريخ</th><th>النوع</th><th>الوصف</th>
+                <th class="num">الإجمالي</th><th class="num">المدفوع</th><th class="num">الباقي</th>
+              </tr>
+            </thead>
+            <tbody id="prevLedgerEntriesTbody"></tbody>
+          </table>
+
+          <div style="font-weight:900; margin:14px 0 8px">المدفوعات</div>
+          <table class="miniTable">
+            <thead>
+              <tr><th>تاريخ</th><th>تفاصيل</th><th class="num">المبلغ</th></tr>
+            </thead>
+            <tbody id="prevLedgerPaysTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ PRINT FOOTER (يظهر في الطباعة فقط) -->
+    <section class="printOnly">
+      <div class="printFooter">
+        <div class="pfText">
+          <div>© Axentro — All Rights Reserved 2024</div>
+          <div class="muted">By Ahmed Hamouda</div>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <!-- ✅ ختم / توقيع اختياري -->
+          <img src="images/stamp.png" alt="Stamp" style="width:110px; height:auto; display:none" id="printStamp">
+          <img src="images/signature.png" alt="Signature" style="width:140px; height:auto; display:none" id="printSign">
+          <img src="images/qr.png" alt="QR Code" style="width:110px; height:auto;">
+        </div>
+      </div>
     </section>
 
   </main>
@@ -519,18 +565,7 @@
 
   <!-- ✅ QR (الشاشة فقط) -->
   <div class="qrFooter" style="text-align:center; padding: 14px 14px 28px;">
-    <img
-      src="images/qr.png"
-      alt="QR Code"
-      style="width: 140px; max-width: 60vw; height: auto; display:inline-block;"
-    />
-  </div>
-
-  <!-- ✅ Print Footer (الطباعة/PDF فقط) -->
-  <div class="printFooter">
-    <p class="pfMeta">© Axentro — All Rights Reserved 2024</p>
-    <p class="pfMeta muted">By Ahmed Hamouda</p>
-    <img src="images/qr.png" alt="QR Code" />
+    <img src="images/qr.png" alt="QR Code" style="width: 140px; max-width: 60vw; height: auto; display:inline-block;" />
   </div>
 
   <!-- ✅ Modal: Add Payment -->
@@ -551,7 +586,7 @@
         <div class="field">
           <label>المبلغ (جنيه)</label>
           <input id="payAmount" type="number" min="0" step="0.01" placeholder="مثال: 200" />
-          <div class="help">التعليمات: اكتب قيمة الدفعة. لو مش هتضيف دفعة سيبها فاضية.</div>
+          <div class="help">التعليمات: اكتب قيمة الدفعة.</div>
         </div>
 
         <div class="field">
@@ -589,10 +624,32 @@
 
   <!-- ✅ الربط مع Google Apps Script (لازم قبل app.js) -->
   <script>
-    window.AXENTRO_API = {
-      scriptUrl: "https://script.google.com/macros/s/AKfycbwj4Igd9LekzmqDWj363Kj_nb82Dhs-I4de6tBKGLQ-hWl-zbjBIEcAnz_RXwNrG_iE/exec",
-      pin: "1234"
-    };
+  window.AXENTRO_API = {
+    scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
+    pin: "1234"
+  };
+</script>
+
+  <script>
+    // ✅ طباعة: حط وقت الطباعة + إظهار الصور لو موجودة فعلًا
+    document.addEventListener("DOMContentLoaded", () => {
+      const nowEl = document.getElementById("printNow");
+      if (nowEl) nowEl.textContent = new Date().toLocaleString("ar-EG");
+
+      // لو الصور موجودة فعلاً في images/ نخليها تظهر
+      const tryShow = (id, src) => {
+        const img = document.getElementById(id);
+        if (!img) return;
+        // نخليها تظهر لو الملف متاح
+        img.addEventListener("error", () => { img.style.display = "none"; });
+        img.addEventListener("load", () => { img.style.display = "inline-block"; });
+        if (src) img.src = src;
+      };
+
+      tryShow("printLogo", "images/logo.png");
+      tryShow("printStamp", "images/stamp.png");
+      tryShow("printSign", "images/signature.png");
+    });
   </script>
 
   <script src="app.js"></script>
