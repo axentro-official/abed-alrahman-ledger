@@ -10,11 +10,11 @@
       - منع دفعة تتجاوز إجمالي العملية
       - معاينة المصروف لا تعرض مدفوعات
 
-   ✅ NEW (for next phase):
-      - تصنيف العمليات ماليًا: (فلوس ليا / فلوس عليا / مصروف)
-      - كشف حساب يدعم فلتر (عميل فقط / مورد فقط) عبر #ledgerMode إن وُجد
-      - الضغط على اسم الشخص يفتح كشف حساب تلقائيًا (fallback لتفاصيل الشخص)
-      - سجل المحذوفات: حذف نهائي لكل سطر مع PIN
+   ✅ NEW (added now):
+      - تقارير Reports (فترة + نوع + اسم/جهة + طباعة)
+      - اتجاه المدفوعات (خارجة out / داخلة in) — افتراضي: out
+      - KPIs متوافقة مع HTML الجديد (kpiReceivable / kpiPayable)
+      - منع حفظ العملية بدون تاريخ بشكل قاطع
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -45,6 +45,13 @@ function loadData(){
     const data = raw ? JSON.parse(raw) : { entries: [], payments: [] };
     if(!Array.isArray(data.entries)) data.entries = [];
     if(!Array.isArray(data.payments)) data.payments = [];
+
+    // ✅ Backward compatibility: أي دفعات قديمة من غير flow تعتبر "خارجة"
+    data.payments = data.payments.map(p => ({
+      ...p,
+      flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
+    }));
+
     return data;
   }catch{
     return { entries: [], payments: [] };
@@ -78,12 +85,12 @@ function typeLabel(t){
   })[t] || "—";
 }
 
-/* ✅ تصنيف مالي (جاهز للـ KPI الجديد) */
+/* ✅ تصنيف مالي */
 function moneySide(entryType){
-  if(entryType === "expense") return "expense";        // مصروف
-  if(entryType === "credit_supplier") return "payable"; // فلوس عليا
+  if(entryType === "expense") return "expense";          // مصروف
+  if(entryType === "credit_supplier") return "payable";  // فلوس عليا
   if(entryType === "credit_customer") return "receivable"; // فلوس ليا
-  if(entryType === "advance") return "receivable";     // سُلفة (فلوس ليا عند الشخص)
+  if(entryType === "advance") return "receivable";       // سُلفة (فلوس ليا)
   return "other";
 }
 function sideLabel(side){
@@ -103,9 +110,11 @@ function escapeHtml(str){
     .replaceAll("'", "&#039;");
 }
 
-function sumPaymentsForEntry(entryId, payments){
+/* ✅ مجموع المدفوعات لعملية (مع خيار فلترة اتجاه الدفع) */
+function sumPaymentsForEntry(entryId, payments, flow = "all"){
   return payments
     .filter(p => p.entryId === entryId)
+    .filter(p => flow === "all" ? true : (p.flow === flow))
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
 }
 
@@ -114,12 +123,16 @@ function sumPaymentsForEntry(entryId, payments){
 */
 function computeEntryView(entry, payments){
   const total = Number(entry.total);
-  const paid = sumPaymentsForEntry(entry.id, payments);
+
+  // ✅ مهم: الدفعات المؤثرة على "المتبقي" هي الدفعات الخارجة (out) فقط
+  // لأنك في "فاتورة مورد" بتدفع، وفي "آجل عميل" غالبًا برضه بتسجل دفعات (حسب استخدامك)
+  // لو عايز عكسه لعميل آجل (دفعات داخلة) قولّي ونغيّرها بسهولة
+  const paid = sumPaymentsForEntry(entry.id, payments, "out");
 
   const side = moneySide(entry.type);
 
   if(entry.type === "expense"){
-    return { ...entry, side, paid, remaining: 0 };
+    return { ...entry, side, paid: 0, remaining: 0 };
   }
 
   const remaining = (Number.isFinite(total) ? Math.max(total - paid, 0) : NaN);
@@ -129,6 +142,7 @@ function computeEntryView(entry, payments){
 /* -------------------- Pages -------------------- */
 const PAGES = [
   "dashboard","records","payments","ledger",
+  "reports",
   "entryPreview","ledgerPreview",
   "trash"
 ];
@@ -146,6 +160,7 @@ function showPage(name){
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if(name === "trash") renderTrash();
+  if(name === "reports") renderReports(); // ✅ NEW
 }
 
 /* -------------------- Auth -------------------- */
@@ -295,7 +310,7 @@ function getEntryFromForm(){
     }
   }
 
-  // ✅ FINAL: ممنوع دفعة أولى للمصروف
+  // ✅ ممنوع دفعة أولى للمصروف
   if(entry.type === "expense"){
     firstPay = null;
     if(el("firstPay")) el("firstPay").value = "";
@@ -356,13 +371,20 @@ function deletePaymentWithLog(payId){
   });
 }
 
-/* -------------------- Render KPIs -------------------- */
+/* -------------------- Render KPIs (Dashboard) -------------------- */
 function computeTotals(entriesView, payments){
   const expensesTotal = entriesView
     .filter(e => e.type === "expense")
     .reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
 
-  const paidTotal = payments.reduce((a,p)=> a + Number(p.amount || 0), 0);
+  // ✅ إجمالي المدفوعات (الخارجة فقط) لأن ده اللي انت قلت "أنا دفعتها"
+  const paidOutTotal = payments
+    .filter(p => (p.flow || "out") === "out")
+    .reduce((a,p)=> a + Number(p.amount || 0), 0);
+
+  const paidInTotal = payments
+    .filter(p => (p.flow || "out") === "in")
+    .reduce((a,p)=> a + Number(p.amount || 0), 0);
 
   const remainingReceivable = entriesView
     .filter(e => e.side === "receivable")
@@ -372,29 +394,20 @@ function computeTotals(entriesView, payments){
     .filter(e => e.side === "payable")
     .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
-  const remainingTotal = entriesView
-    .filter(e => e.type !== "expense")
-    .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
-
-  return { expensesTotal, paidTotal, remainingReceivable, remainingPayable, remainingTotal };
+  return { expensesTotal, paidOutTotal, paidInTotal, remainingReceivable, remainingPayable };
 }
 
 function renderKPIs(entriesView, payments){
   const t = computeTotals(entriesView, payments);
 
-  // الموجود حاليًا في HTML:
-  // kpiExpenses = مصروفات
-  // kpiPaid     = إجمالي المدفوعات
-  // kpiRemaining= إجمالي المستحق (حالياً إجمالي المتبقي لكل ما ليس مصروف)
-  // kpiCount    = عدد العمليات
   el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(t.expensesTotal));
-  el("kpiPaid") && (el("kpiPaid").textContent = fmt(t.paidTotal));
-  el("kpiRemaining") && (el("kpiRemaining").textContent = fmt(t.remainingTotal));
-  el("kpiCount") && (el("kpiCount").textContent = entriesView.length.toLocaleString("ar-EG"));
+  el("kpiPaid") && (el("kpiPaid").textContent = fmt(t.paidOutTotal)); // ✅ خارجة فقط
 
-  // ✅ جاهز للمرحلة الجاية: لو زودنا IDs جديدة في HTML
-  // el("kpiReceivable") && (el("kpiReceivable").textContent = fmt(t.remainingReceivable));
-  // el("kpiPayable") && (el("kpiPayable").textContent = fmt(t.remainingPayable));
+  // ✅ الجديد الموجود في HTML
+  el("kpiReceivable") && (el("kpiReceivable").textContent = fmt(t.remainingReceivable));
+  el("kpiPayable") && (el("kpiPayable").textContent = fmt(t.remainingPayable));
+
+  el("kpiCount") && (el("kpiCount").textContent = entriesView.length.toLocaleString("ar-EG"));
 }
 
 /* -------------------- Filters -------------------- */
@@ -438,7 +451,6 @@ function renderEntriesTable(entriesView){
       ? `<button class="btn small" type="button" disabled title="المصروف لا يحتاج دفعات">إضافة دفعة</button>`
       : `<button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>`;
 
-    // ✅ الاسم clickable → يفتح كشف الحساب تلقائيًا (fallback لتفاصيل الشخص)
     const partyCell = `
       <button class="btn small ghost" data-act="person" data-name="${escapeHtml(e.party || "")}" data-side="${e.side}">
         ${escapeHtml(e.party || "")}
@@ -468,6 +480,10 @@ function renderEntriesTable(entriesView){
 }
 
 /* -------------------- Payments Table -------------------- */
+function flowLabel(flow){
+  return flow === "in" ? "متحصلات داخلة" : "مدفوعات خارجة";
+}
+
 function renderPaymentsTable(payments, entries){
   const tbody = el("payTbody");
   if(!tbody) return;
@@ -482,7 +498,8 @@ function renderPaymentsTable(payments, entries){
     const en = entryById.get(p.entryId);
     const party = (p.party || en?.party || "").toLowerCase();
     const note = (p.note || "").toLowerCase();
-    return party.includes(q) || note.includes(q);
+    const flow = flowLabel(p.flow || "out").toLowerCase();
+    return party.includes(q) || note.includes(q) || flow.includes(q);
   });
 
   const sorted = [...filtered].sort((a,b)=>
@@ -492,11 +509,12 @@ function renderPaymentsTable(payments, entries){
   for(const p of sorted){
     const en = entryById.get(p.entryId);
     const ref = en ? `${typeLabel(en.type)} • ${en.date} • إجمالي ${fmt(en.total)}` : "—";
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.date || "—"}</td>
       <td>${escapeHtml(p.party || en?.party || "—")}</td>
-      <td>${escapeHtml(ref)}</td>
+      <td>${escapeHtml(ref)} • <span class="badge">${flowLabel(p.flow || "out")}</span></td>
       <td class="num">${fmt(p.amount)}</td>
       <td>${escapeHtml(p.note || "—")}</td>
       <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
@@ -508,6 +526,33 @@ function renderPaymentsTable(payments, entries){
 /* -------------------- Payments Modal -------------------- */
 let CURRENT_PAY_ENTRY_ID = null;
 
+/* ✅ نضيف اختيار اتجاه الدفع تلقائيًا داخل مودال الدفع بدون تعديل HTML */
+function ensurePayFlowControl(){
+  const modalBody = el("payModal")?.querySelector(".modalBody");
+  if(!modalBody) return;
+
+  if(el("payFlow")) return; // موجود بالفعل
+
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  wrap.innerHTML = `
+    <label>اتجاه الدفعة</label>
+    <select id="payFlow">
+      <option value="out" selected>مدفوعات خارجة (أنا دفعت)</option>
+      <option value="in">متحصلات داخلة (اتدفعتلي)</option>
+    </select>
+    <div class="help">اختار هل الدفعة خرجت منك ولا دخلت لك.</div>
+  `;
+
+  // نحطه قبل زر الحفظ
+  const saveBtn = el("paySave");
+  if(saveBtn){
+    modalBody.insertBefore(wrap, saveBtn);
+  }else{
+    modalBody.appendChild(wrap);
+  }
+}
+
 function openPayModal(entryId){
   const data = loadData();
   const entry = data.entries.find(e => e.id === entryId);
@@ -516,11 +561,17 @@ function openPayModal(entryId){
     return;
   }
 
+  ensurePayFlowControl();
+
   CURRENT_PAY_ENTRY_ID = entryId;
   el("payDate") && (el("payDate").value = todayISO());
   el("payAmount") && (el("payAmount").value = "");
   el("payNote") && (el("payNote").value = "");
   el("payError") && (el("payError").hidden = true);
+
+  // افتراضي: out (أنا دفعت)
+  el("payFlow") && (el("payFlow").value = "out");
+
   el("payModal") && (el("payModal").hidden = false);
 }
 function closePayModal(){
@@ -560,7 +611,6 @@ function openEntryPreview(entryId){
   if(tb){
     tb.innerHTML = "";
 
-    // ✅ FINAL: المصروف لا نعرض له مدفوعات حتى لو قديمًا اتسجل بالغلط
     if(v.type === "expense"){
       tb.innerHTML = `<tr><td colspan="3">المصروف لا يحتوي على مدفوعات.</td></tr>`;
     } else {
@@ -575,7 +625,7 @@ function openEntryPreview(entryId){
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${p.date || "—"}</td>
-            <td>${escapeHtml(p.note || "—")}</td>
+            <td>${escapeHtml(`${p.note || "—"} • ${flowLabel(p.flow || "out")}`)}</td>
             <td class="num">${fmt(p.amount)}</td>
           `;
           tb.appendChild(tr);
@@ -587,24 +637,18 @@ function openEntryPreview(entryId){
   showPage("entryPreview");
 }
 
-/* -------------------- Ledger: Partial Search + Live + Mode -------------------- */
+/* -------------------- Ledger -------------------- */
 let ledgerTimer = null;
 
 function getLedgerMode(){
-  // ✅ هنضيفه في HTML بعدين، لكن لو موجود دلوقتي يشتغل فورًا
   const m = (el("ledgerMode")?.value || "all").trim();
   return (m === "customer" || m === "supplier" || m === "all") ? m : "all";
 }
 
 function entryMatchesLedgerMode(entry, mode){
   if(mode === "all") return true;
-
-  // customer = فلوس ليا (عميل + سلفة)
   if(mode === "customer") return entry.side === "receivable";
-
-  // supplier = فلوس عليا (مورد)
   if(mode === "supplier") return entry.side === "payable";
-
   return true;
 }
 
@@ -630,7 +674,6 @@ function showLedger(name){
     .filter(e => entryMatchesLedgerMode(e, mode))
     .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
 
-  // المدفوعات: نعرضها فقط لو مرتبطة بعمليات ضمن نفس الفلتر (حتى لا تلخبط)
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
   const pays = paysAll
@@ -654,7 +697,7 @@ function showLedger(name){
 
   box.innerHTML += `
     <div class="line"><b>الإجمالي${headerMode}</b><b>${fmt(total)}</b></div>
-    <div class="line"><span>المدفوع</span><b>${fmt(paid)}</b></div>
+    <div class="line"><span>المدفوع (خارجة)</span><b>${fmt(paid)}</b></div>
     <div class="line"><span>المتبقي</span><b>${fmt(rem)}</b></div>
   `;
 
@@ -684,7 +727,7 @@ function showLedger(name){
         <div class="line">
           <div style="max-width:70%">
             <div><b>${escapeHtml(p.party || "—")}</b></div>
-            <div class="muted">${p.date || "—"} • ${escapeHtml(p.note || "—")}</div>
+            <div class="muted">${p.date || "—"} • ${escapeHtml(p.note || "—")} • ${flowLabel(p.flow || "out")}</div>
           </div>
           <div style="text-align:left; min-width: 140px">
             <div>دفعة: <b>${fmt(p.amount)}</b></div>
@@ -695,18 +738,14 @@ function showLedger(name){
   }
 }
 
-/* ✅ فتح “تفاصيل شخص” (fallback لكشف حساب لحد ما نبني صفحة التفاصيل) */
 function openPersonDetails(name, side = "all"){
   const clean = (name || "").trim();
   if(!clean) return;
 
-  // لو صفحة تفاصيل الشخص اتضافت بعدين هنستخدمها
-  // حالياً: نعمل fallback لكشف الحساب مباشرة
   showPage("ledger");
   if(el("ledgerName")){
     el("ledgerName").value = clean;
 
-    // لو في ledgerMode: نضبطه حسب side
     if(el("ledgerMode")){
       if(side === "payable") el("ledgerMode").value = "supplier";
       else if(side === "receivable") el("ledgerMode").value = "customer";
@@ -779,6 +818,183 @@ function renderTrash(){
   }
 }
 
+/* -------------------- Reports (NEW) -------------------- */
+function toDateNum(iso){
+  // YYYY-MM-DD -> رقم للمقارنة
+  if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
+  return Number(iso.replaceAll("-", ""));
+}
+function clampDateRange(fromISO, toISO){
+  const f = toDateNum(fromISO);
+  const t = toDateNum(toISO);
+  if(!Number.isFinite(f) || !Number.isFinite(t)) return null;
+  if(f > t) return { fromISO: toISO, toISO: fromISO };
+  return { fromISO, toISO };
+}
+function presetRange(preset){
+  const today = todayISO();
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,"0");
+  const firstDayMonth = `${y}-${m}-01`;
+  const firstDayYear = `${y}-01-01`;
+
+  if(preset === "today") return { fromISO: today, toISO: today };
+  if(preset === "this_month") return { fromISO: firstDayMonth, toISO: today };
+  if(preset === "this_year") return { fromISO: firstDayYear, toISO: today };
+
+  if(preset === "last_7" || preset === "last_30"){
+    const days = preset === "last_7" ? 7 : 30;
+    const d = new Date();
+    d.setDate(d.getDate() - (days-1));
+    const from = d.toISOString().slice(0,10);
+    return { fromISO: from, toISO: today };
+  }
+
+  return null;
+}
+
+function filterEntriesByReportType(entriesView, repType){
+  if(repType === "all") return entriesView;
+
+  if(repType === "payments_out" || repType === "receipts_in"){
+    // نوع خاص بالمدفوعات مش بالعمليات
+    return [];
+  }
+
+  return entriesView.filter(e => e.type === repType);
+}
+
+function renderReports(){
+  const hasUI = !!el("page-reports");
+  if(!hasUI) return;
+
+  const data = loadData();
+  const entriesViewAll = data.entries.map(e => computeEntryView(e, data.payments));
+  const paymentsAll = data.payments;
+
+  // اقرأ الفلاتر
+  const preset = el("repRangePreset")?.value || "custom";
+  const type = el("repType")?.value || "all";
+  const partyQ = (el("repParty")?.value || "").trim().toLowerCase();
+
+  let fromISO = el("repFrom")?.value || "";
+  let toISO   = el("repTo")?.value || "";
+
+  const pr = presetRange(preset);
+  if(pr){
+    fromISO = pr.fromISO;
+    toISO = pr.toISO;
+    if(el("repFrom")) el("repFrom").value = fromISO;
+    if(el("repTo")) el("repTo").value = toISO;
+  }
+
+  const rr = clampDateRange(fromISO, toISO);
+  const fromNum = rr ? toDateNum(rr.fromISO) : NaN;
+  const toNum   = rr ? toDateNum(rr.toISO) : NaN;
+
+  const inRange = (iso)=> {
+    const n = toDateNum(iso);
+    if(!Number.isFinite(fromNum) || !Number.isFinite(toNum)) return true; // لو مفيش تواريخ اعتبره الكل
+    return Number.isFinite(n) && n >= fromNum && n <= toNum;
+  };
+
+  // فلترة العمليات
+  let entries = entriesViewAll.filter(e => inRange(e.date));
+  if(partyQ){
+    entries = entries.filter(e =>
+      (e.party || "").toLowerCase().includes(partyQ) ||
+      (e.desc || "").toLowerCase().includes(partyQ) ||
+      (e.notes || "").toLowerCase().includes(partyQ)
+    );
+  }
+
+  // فلترة حسب النوع
+  const entriesAfterType = filterEntriesByReportType(entries, type);
+
+  // فلترة المدفوعات
+  let pays = paymentsAll.filter(p => inRange(p.date));
+  if(partyQ){
+    pays = pays.filter(p =>
+      (p.party || "").toLowerCase().includes(partyQ) ||
+      (p.note || "").toLowerCase().includes(partyQ)
+    );
+  }
+
+  // فلترة مدفوعات حسب النوع الخاص (out/in) لو اختارها
+  if(type === "payments_out") pays = pays.filter(p => (p.flow || "out") === "out");
+  if(type === "receipts_in") pays = pays.filter(p => (p.flow || "out") === "in");
+
+  // KPIs للتقارير
+  const repEntriesCount = entriesAfterType.length;
+
+  const repPaysTotal = pays.reduce((a,p)=> a + Number(p.amount || 0), 0);
+
+  const repReceivable = entriesAfterType
+    .filter(e => e.side === "receivable")
+    .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
+
+  const repPayable = entriesAfterType
+    .filter(e => e.side === "payable")
+    .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
+
+  el("repKpiEntries") && (el("repKpiEntries").textContent = repEntriesCount.toLocaleString("ar-EG"));
+  el("repKpiPays") && (el("repKpiPays").textContent = fmt(repPaysTotal));
+  el("repKpiReceivable") && (el("repKpiReceivable").textContent = fmt(repReceivable));
+  el("repKpiPayable") && (el("repKpiPayable").textContent = fmt(repPayable));
+
+  // جدول العمليات في التقارير
+  const repEntriesTbody = el("repEntriesTbody");
+  if(repEntriesTbody){
+    repEntriesTbody.innerHTML = "";
+    const sorted = [...entriesAfterType].sort((a,b)=>
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
+    );
+
+    if(sorted.length === 0){
+      repEntriesTbody.innerHTML = `<tr><td colspan="7">لا توجد عمليات داخل هذه الفلاتر.</td></tr>`;
+    }else{
+      for(const e of sorted){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${e.date || "—"}</td>
+          <td><span class="badge">${typeLabel(e.type)}</span></td>
+          <td>${escapeHtml(e.party || "—")}</td>
+          <td>${escapeHtml(e.desc || "—")}</td>
+          <td class="num">${fmt(e.total)}</td>
+          <td class="num">${fmt(e.paid)}</td>
+          <td class="num">${fmt(e.remaining)}</td>
+        `;
+        repEntriesTbody.appendChild(tr);
+      }
+    }
+  }
+
+  // جدول المدفوعات في التقارير
+  const repPaysTbody = el("repPaysTbody");
+  if(repPaysTbody){
+    repPaysTbody.innerHTML = "";
+    const sortedPays = [...pays].sort((a,b)=>
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
+    );
+
+    if(sortedPays.length === 0){
+      repPaysTbody.innerHTML = `<tr><td colspan="4">لا توجد مدفوعات داخل هذه الفلاتر.</td></tr>`;
+    }else{
+      for(const p of sortedPays){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.date || "—"}</td>
+          <td>${escapeHtml(p.party || "—")}</td>
+          <td>${escapeHtml(`${p.note || "—"} • ${flowLabel(p.flow || "out")}`)}</td>
+          <td class="num">${fmt(p.amount)}</td>
+        `;
+        repPaysTbody.appendChild(tr);
+      }
+    }
+  }
+}
+
 /* -------------------- Refresh -------------------- */
 function refresh(){
   const data = loadData();
@@ -791,6 +1007,11 @@ function refresh(){
   const trashPage = document.getElementById("page-trash");
   if(trashPage && !trashPage.hidden){
     renderTrash();
+  }
+
+  const reportsPage = document.getElementById("page-reports");
+  if(reportsPage && !reportsPage.hidden){
+    renderReports();
   }
 }
 
@@ -828,26 +1049,31 @@ document.addEventListener("DOMContentLoaded", () => {
       if(v !== "" && Number(v) <= 0) el("firstPay").value = "";
       if(el("type")?.value === "expense") el("firstPay").value = "";
     });
-    // ✅ لو النوع اتغير إلى مصروف: امسح الدفعة الأولى فورًا
     el("type")?.addEventListener("change", ()=>{
       if(el("type").value === "expense" && el("firstPay")) el("firstPay").value = "";
     });
 
-    // ✅ Add Entry
+    // ✅ Add Entry — منع حفظ بدون تاريخ 100%
     el("entryForm")?.addEventListener("submit", (ev)=>{
       ev.preventDefault();
 
       const { entry, firstPay } = getEntryFromForm();
       const err = validateEntry(entry);
-      if(err) return alert(err);
+      if(err){
+        alert(err);
+        return;
+      }
 
       if(firstPay !== null){
-        if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
+        if(firstPay > entry.total){
+          alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
+          return;
+        }
       }
 
       addEntry(entry);
 
-      // ✅ إضافة دفعة أولى فقط لو النوع ليس مصروف
+      // ✅ دفعة أولى: تعتبر افتراضياً "خارجة" (أنا دفعت)
       if(firstPay !== null && entry.type !== "expense"){
         addPayment({
           id: uid(),
@@ -856,6 +1082,7 @@ document.addEventListener("DOMContentLoaded", () => {
           party: entry.party,
           amount: firstPay,
           note: "دفعة أولى",
+          flow: "out",
           createdAt: Date.now()
         });
       }
@@ -873,6 +1100,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     el("payQ")?.addEventListener("input", refresh);
     el("trashQ")?.addEventListener("input", refresh);
+
+    // ✅ Reports events
+    el("btnRunReports")?.addEventListener("click", renderReports);
+    el("btnPrintReports")?.addEventListener("click", ()=> window.print());
+    el("repRangePreset")?.addEventListener("change", renderReports);
+    el("repFrom")?.addEventListener("change", renderReports);
+    el("repTo")?.addEventListener("change", renderReports);
+    el("repType")?.addEventListener("change", renderReports);
+    el("repParty")?.addEventListener("input", ()=>{
+      clearTimeout(ledgerTimer);
+      ledgerTimer = setTimeout(renderReports, 250);
+    });
 
     // ✅ Table actions
     el("tbody")?.addEventListener("click", (ev)=>{
@@ -936,16 +1175,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const date = (el("payDate")?.value || "").trim();
       const amount = (el("payAmount")?.value === "" || el("payAmount") == null) ? null : Number(el("payAmount").value);
       const note = (el("payNote")?.value || "").trim();
+      const flow = (el("payFlow")?.value || "out").trim(); // ✅ NEW
 
       if(!date || amount === null || !Number.isFinite(amount) || amount <= 0){
         el("payError") && (el("payError").hidden = false);
         return;
       }
 
-      // ✅ FINAL: منع الدفع أكثر من الإجمالي
-      const alreadyPaid = sumPaymentsForEntry(entry.id, data.payments);
-      if(Number.isFinite(entry.total) && (alreadyPaid + amount) > Number(entry.total) + 1e-9){
-        alert(`لا يمكن أن تتجاوز المدفوعات إجمالي العملية.\nالمدفوع حاليًا: ${fmt(alreadyPaid)}\nالإجمالي: ${fmt(entry.total)}`);
+      // ✅ منع الدفع أكثر من الإجمالي (يحسب على الدفعات الخارجة فقط)
+      const alreadyPaidOut = sumPaymentsForEntry(entry.id, data.payments, "out");
+      if(flow === "out" && Number.isFinite(entry.total) && (alreadyPaidOut + amount) > Number(entry.total) + 1e-9){
+        alert(`لا يمكن أن تتجاوز المدفوعات الخارجة إجمالي العملية.\nالمدفوع حاليًا: ${fmt(alreadyPaidOut)}\nالإجمالي: ${fmt(entry.total)}`);
         return;
       }
 
@@ -956,6 +1196,7 @@ document.addEventListener("DOMContentLoaded", () => {
         party: entry.party,
         amount,
         note,
+        flow: (flow === "in" ? "in" : "out"),
         createdAt: Date.now()
       });
 
@@ -1001,7 +1242,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     el("btnLedger")?.addEventListener("click", ()=> showLedger(el("ledgerName").value));
 
-    // ✅ لو أضفت ledgerMode في HTML: غير الفلتر ينعكس فوراً
     el("ledgerMode")?.addEventListener("change", ()=>{
       showLedger(el("ledgerName")?.value || "");
     });
