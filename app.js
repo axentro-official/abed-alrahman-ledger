@@ -2,6 +2,7 @@
    ✅ PIN ثابت: 1234
    ✅ مدفوعات منفصلة payments[] مرتبطة بكل عملية entryId
    ✅ لا يوجد أي 0 تلقائي في الحقول
+   ✅ صفحات (Dashboard / Records / Payments / Ledger) + Logout
 */
 
 const LS_KEY = "abed_alrahman_ledger_v2";
@@ -66,10 +67,25 @@ function computeEntryView(entry, payments){
   return { ...entry, paid, remaining };
 }
 
+/* ---------- Pages ---------- */
+const PAGES = ["dashboard","records","payments","ledger"];
+
+function showPage(name){
+  PAGES.forEach(p=>{
+    const node = document.getElementById("page-"+p);
+    if(node) node.hidden = (p !== name);
+  });
+
+  document.querySelectorAll(".navBtn").forEach(b=>{
+    b.classList.toggle("active", b.dataset.page === name);
+  });
+}
+
 /* ---------- PIN Gate ---------- */
 function setupPinGate(){
   const gate = el("pinGate");
   const root = el("appRoot");
+  const nav = el("navBar");
   const pinForm = el("pinForm");
   const pinInput = el("pinInput");
   const pinError = el("pinError");
@@ -88,8 +104,13 @@ function setupPinGate(){
       gate.hidden = true;
       gate.style.display = "none";   // ✅ تأكيد إضافي
       root.hidden = false;
+      nav.hidden = false;
+
       pinError.hidden = true;
       pinInput.value = "";
+      pinInput.type = "password";
+
+      showPage("dashboard");
       refresh();
     } else {
       pinError.hidden = false;
@@ -154,7 +175,7 @@ function addPayment(payment){
 function deleteEntry(entryId){
   const data = loadData();
   data.entries = data.entries.filter(e => e.id !== entryId);
-  data.payments = data.payments.filter(p => p.entryId !== entryId);
+  data.payments = data.payments.filter(p => p.entryId !== entryId); // حذف مدفوعاته
   saveData(data);
 }
 
@@ -260,7 +281,9 @@ function renderPaymentsTable(payments, entries){
       <td>${escapeHtml(ref)}</td>
       <td class="num">${fmt(p.amount)}</td>
       <td>${escapeHtml(p.note || "—")}</td>
-      <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
+      <td>
+        <button class="btn small danger" data-paydel="${p.id}">حذف</button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
@@ -400,6 +423,7 @@ function importJSON(file){
 function refresh(){
   const data = loadData();
   const entriesView = data.entries.map(e => computeEntryView(e, data.payments));
+
   renderKPIs(entriesView, data.payments);
   renderEntriesTable(applyEntryFilters(entriesView));
   renderPaymentsTable(data.payments, data.entries);
@@ -409,6 +433,33 @@ function refresh(){
 document.addEventListener("DOMContentLoaded", () => {
   setupPinGate();
 
+  // ✅ Navigation buttons
+  document.querySelectorAll(".navBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> showPage(btn.dataset.page));
+  });
+
+  // ✅ Back to dashboard buttons
+  document.querySelectorAll("[data-go='dashboard']").forEach(btn=>{
+    btn.addEventListener("click", ()=> showPage("dashboard"));
+  });
+
+  // ✅ Logout
+  el("btnLogout").addEventListener("click", ()=>{
+    if(confirm("هل تريد تسجيل الخروج؟")){
+      el("appRoot").hidden = true;
+      el("navBar").hidden = true;
+
+      const gate = el("pinGate");
+      gate.hidden = false;
+      gate.style.display = "block";
+
+      el("pinInput").type = "password";
+      el("pinInput").value = "";
+      el("pinError").hidden = true;
+    }
+  });
+
+  // نموذج إضافة عملية
   el("entryForm").addEventListener("submit", (ev)=>{
     ev.preventDefault();
 
@@ -418,6 +469,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     addEntry(entry);
 
+    // لو في دفعة أولى (اختياري)
     if(firstPay !== null){
       if(!Number.isFinite(firstPay) || firstPay <= 0) return alert("الدفعة الأولى لازم تكون رقم أكبر من صفر أو سيبها فاضية.");
       if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
@@ -439,13 +491,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   el("btnReset").addEventListener("click", resetForm);
 
+  // فلاتر العمليات
   ["q","filterType","filterOpen"].forEach(id=>{
     el(id).addEventListener("input", refresh);
     el(id).addEventListener("change", refresh);
   });
 
+  // فلاتر المدفوعات
   el("payQ").addEventListener("input", refresh);
 
+  // أزرار الجدول (إضافة دفعة / حذف عملية)
   el("tbody").addEventListener("click", (ev)=>{
     const btn = ev.target.closest("button");
     if(!btn) return;
@@ -465,6 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // مودال الدفعات
   el("payClose").addEventListener("click", closePayModal);
   el("payModal").addEventListener("click", (ev)=>{
     if(ev.target === el("payModal")) closePayModal();
@@ -498,6 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
     refresh();
   });
 
+  // حذف دفعة من جدول المدفوعات
   el("payTbody").addEventListener("click", (ev)=>{
     const btn = ev.target.closest("button");
     if(!btn) return;
@@ -510,6 +567,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // حذف كل البيانات
   el("btnClearAll").addEventListener("click", ()=>{
     if(confirm("تحذير: سيتم حذف كل البيانات نهائيًا من هذا الجهاز. هل أنت متأكد؟")){
       localStorage.removeItem(LS_KEY);
@@ -518,6 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // تصدير/استيراد
   el("btnExport").addEventListener("click", ()=> exportJSON(loadData()));
   el("btnPaymentsExport").addEventListener("click", exportPaymentsOnly);
 
@@ -527,7 +586,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ev.target.value = "";
   });
 
+  // طباعة (يطبع الصفحة الحالية كما هي)
   el("btnPrint").addEventListener("click", ()=> window.print());
 
+  // كشف حساب
   el("btnLedger").addEventListener("click", ()=> showLedger(el("ledgerName").value));
 });
