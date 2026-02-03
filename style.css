@@ -42,6 +42,20 @@ h1{margin:0; font-size:18px; line-height:1.1}
 
 .actions{display:flex; gap:8px; flex-wrap:wrap}
 
+/* ✅ NEW: admin tag (إدارة هيثم جنب الاسم بخط صغير) */
+.adminTag{
+  display:inline-block;
+  margin-inline-start:10px;
+  padding:3px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: rgba(231,238,252,.88);
+  font-size:12px;
+  font-weight:800;
+  vertical-align: middle;
+}
+
 /* ✅ Container */
 .container{max-width:1200px; margin:18px auto; padding:0 14px 28px}
 
@@ -324,7 +338,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
   font-weight:700;
 }
 
-/* ✅ NAV (pages) */
+/* ✅ NAV (Tabs) */
 .navBar{
   display:flex;
   gap:8px;
@@ -332,11 +346,19 @@ input::placeholder{color: rgba(169,183,208,.7)}
   background: rgba(11,18,32,.85);
   border-bottom:1px solid var(--stroke);
   position:sticky;
-  top:64px;
+  top: calc(14px + 42px + 14px); /* تقريباً ارتفاع الهيدر */
   z-index:9;
+
+  /* ✅ NEW: على الموبايل لو التابات كتير يبقى سكرول */
+  overflow-x:auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.navBar::-webkit-scrollbar{display:none}
+
 .navBtn{
-  flex:1;
+  flex: 0 0 auto;           /* ✅ NEW */
+  min-width: 140px;         /* ✅ NEW */
   padding:10px;
   border-radius:14px;
   border:1px solid var(--stroke);
@@ -344,7 +366,12 @@ input::placeholder{color: rgba(169,183,208,.7)}
   color:var(--text);
   font-weight:900;
   cursor:pointer;
+  white-space: nowrap;
 }
+@media (min-width: 760px){
+  .navBtn{flex:1; min-width: 0}
+}
+
 .navBtn.active{
   background: linear-gradient(135deg, rgba(0,140,255,.9), rgba(0,188,212,.8));
 }
@@ -382,7 +409,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
    ✅ NEW: Preview / Print Styles (PDF via Print)
    ========================================================= */
 
-/* صفحات المعاينة (هنستخدمها في index/app.js) */
+/* صفحات المعاينة */
 .previewWrap{
   display:grid;
   gap:12px;
@@ -469,17 +496,13 @@ input::placeholder{color: rgba(169,183,208,.7)}
 
 /* =========================================================
    ✅ PRINT MODE (Save as PDF)
-   - نخفي الـHeader/Nav/Buttons
-   - نطلع ورقة نظيفة جاهزة للطباعة
    ========================================================= */
 @media print{
-  /* خلفية بيضاء للطباعة */
   body{
     background:#fff !important;
     color:#0f172a !important;
   }
 
-  /* إخفاء عناصر واجهة التطبيق */
   .topbar,
   .navBar,
   .footer2,
@@ -490,18 +513,17 @@ input::placeholder{color: rgba(169,183,208,.7)}
   .pageHead,
   .previewActions,
   #pinGate,
-  #payModal{
+  #payModal,
+  #pinConfirmModal{
     display:none !important;
   }
 
-  /* توسيع المحتوى */
   .container{
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* كروت الطباعة بدون ظل */
   .card,
   .printCard{
     box-shadow:none !important;
@@ -527,7 +549,6 @@ input::placeholder{color: rgba(169,183,208,.7)}
     color:#0f172a !important;
   }
 
-  /* منع جدول السجل الكبير من كسر الصفحة بشكل سيء */
   .tableWrap{
     border:0 !important;
     overflow:visible !important;
@@ -537,7 +558,6 @@ input::placeholder{color: rgba(169,183,208,.7)}
     width: 100% !important;
   }
 
-  /* إلغاء sticky في الطباعة */
   .table th{
     position: static !important;
   }
