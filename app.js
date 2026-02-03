@@ -73,12 +73,20 @@ function setupPinGate(){
   const pinForm = el("pinForm");
   const pinInput = el("pinInput");
   const pinError = el("pinError");
+  const toggle = el("pinToggle");
+
+  // ✅ Toggle show/hide PIN
+  toggle?.addEventListener("click", ()=>{
+    pinInput.type = (pinInput.type === "password") ? "text" : "password";
+  });
 
   pinForm.addEventListener("submit", (ev)=>{
     ev.preventDefault();
     const v = (pinInput.value || "").trim();
+
     if(v === PIN_CODE){
       gate.hidden = true;
+      gate.style.display = "none";   // ✅ تأكيد إضافي
       root.hidden = false;
       pinError.hidden = true;
       pinInput.value = "";
@@ -146,7 +154,7 @@ function addPayment(payment){
 function deleteEntry(entryId){
   const data = loadData();
   data.entries = data.entries.filter(e => e.id !== entryId);
-  data.payments = data.payments.filter(p => p.entryId !== entryId); // حذف مدفوعاته
+  data.payments = data.payments.filter(p => p.entryId !== entryId);
   saveData(data);
 }
 
@@ -252,9 +260,7 @@ function renderPaymentsTable(payments, entries){
       <td>${escapeHtml(ref)}</td>
       <td class="num">${fmt(p.amount)}</td>
       <td>${escapeHtml(p.note || "—")}</td>
-      <td>
-        <button class="btn small danger" data-paydel="${p.id}">حذف</button>
-      </td>
+      <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
     `;
     tbody.appendChild(tr);
   }
@@ -373,8 +379,6 @@ function importJSON(file){
       if(!obj) throw new Error("bad");
 
       const data = loadData();
-
-      // لو ملف كامل
       if(Array.isArray(obj.entries) || Array.isArray(obj.payments)){
         data.entries = Array.isArray(obj.entries) ? obj.entries : data.entries;
         data.payments = Array.isArray(obj.payments) ? obj.payments : data.payments;
@@ -396,7 +400,6 @@ function importJSON(file){
 function refresh(){
   const data = loadData();
   const entriesView = data.entries.map(e => computeEntryView(e, data.payments));
-
   renderKPIs(entriesView, data.payments);
   renderEntriesTable(applyEntryFilters(entriesView));
   renderPaymentsTable(data.payments, data.entries);
@@ -406,7 +409,6 @@ function refresh(){
 document.addEventListener("DOMContentLoaded", () => {
   setupPinGate();
 
-  // نموذج إضافة عملية
   el("entryForm").addEventListener("submit", (ev)=>{
     ev.preventDefault();
 
@@ -416,7 +418,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     addEntry(entry);
 
-    // لو في دفعة أولى (اختياري)
     if(firstPay !== null){
       if(!Number.isFinite(firstPay) || firstPay <= 0) return alert("الدفعة الأولى لازم تكون رقم أكبر من صفر أو سيبها فاضية.");
       if(firstPay > entry.total) return alert("الدفعة الأولى لا يمكن أن تتجاوز الإجمالي.");
@@ -438,16 +439,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   el("btnReset").addEventListener("click", resetForm);
 
-  // فلاتر العمليات
   ["q","filterType","filterOpen"].forEach(id=>{
     el(id).addEventListener("input", refresh);
     el(id).addEventListener("change", refresh);
   });
 
-  // فلاتر المدفوعات
   el("payQ").addEventListener("input", refresh);
 
-  // أزرار الجدول (إضافة دفعة / حذف عملية)
   el("tbody").addEventListener("click", (ev)=>{
     const btn = ev.target.closest("button");
     if(!btn) return;
@@ -467,7 +465,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // مودال الدفعات
   el("payClose").addEventListener("click", closePayModal);
   el("payModal").addEventListener("click", (ev)=>{
     if(ev.target === el("payModal")) closePayModal();
@@ -501,7 +498,6 @@ document.addEventListener("DOMContentLoaded", () => {
     refresh();
   });
 
-  // حذف دفعة من جدول المدفوعات
   el("payTbody").addEventListener("click", (ev)=>{
     const btn = ev.target.closest("button");
     if(!btn) return;
@@ -514,7 +510,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // حذف كل البيانات
   el("btnClearAll").addEventListener("click", ()=>{
     if(confirm("تحذير: سيتم حذف كل البيانات نهائيًا من هذا الجهاز. هل أنت متأكد؟")){
       localStorage.removeItem(LS_KEY);
@@ -523,7 +518,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // تصدير/استيراد
   el("btnExport").addEventListener("click", ()=> exportJSON(loadData()));
   el("btnPaymentsExport").addEventListener("click", exportPaymentsOnly);
 
@@ -533,9 +527,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ev.target.value = "";
   });
 
-  // طباعة
   el("btnPrint").addEventListener("click", ()=> window.print());
 
-  // كشف حساب
   el("btnLedger").addEventListener("click", ()=> showLedger(el("ledgerName").value));
 });
