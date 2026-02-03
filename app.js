@@ -5,6 +5,10 @@
    ✅ حذف بــ PIN + سجل محذوفات (Trash)
    ✅ كشف حساب: بحث جزئي + بحث مباشر + تنسيق أوضح
    ✅ معاينة عملية (Entry Preview) + طباعة/PDF
+   ✅ FINAL FIXES:
+      - منع دفعة أولى للمصروف
+      - منع دفعة تتجاوز إجمالي العملية
+      - معاينة المصروف لا تعرض مدفوعات
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -83,15 +87,13 @@ function sumPaymentsForEntry(entryId, payments){
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
 }
 
-/* ✅ أهم تعديل هنا:
-   - المصروفات ليست “مستحقات”
-   - فـ remaining للمصروف = 0 دايمًا
+/* ✅ المصروفات ليست “مستحقات”
+   remaining للمصروف = 0 دايمًا
 */
 function computeEntryView(entry, payments){
   const total = Number(entry.total);
   const paid = sumPaymentsForEntry(entry.id, payments);
 
-  // ✅ Expense: not a receivable/debt → remaining always 0
   if(entry.type === "expense"){
     return { ...entry, paid, remaining: 0 };
   }
@@ -249,8 +251,10 @@ function getEntryFromForm(){
     createdAt: Date.now()
   };
 
+  // ✅ دفعة أولى
   const fpRaw = el("firstPay")?.value;
   let firstPay = null;
+
   if(fpRaw != null && fpRaw !== ""){
     const fpNum = Number(fpRaw);
     if(Number.isFinite(fpNum) && fpNum > 0) firstPay = fpNum;
@@ -258,6 +262,12 @@ function getEntryFromForm(){
       firstPay = null;
       if(el("firstPay")) el("firstPay").value = "";
     }
+  }
+
+  // ✅ FINAL: ممنوع دفعة أولى للمصروف
+  if(entry.type === "expense"){
+    firstPay = null;
+    if(el("firstPay")) el("firstPay").value = "";
   }
 
   return { entry, firstPay };
@@ -323,10 +333,9 @@ function renderKPIs(entriesView, payments){
 
   const paidTotal = payments.reduce((a,p)=> a + Number(p.amount || 0), 0);
 
-  // ✅ أهم تعديل:
-  // إجمالي المستحق = مجموع الباقي للأنواع اللي عليها “ديون/مستحقات” فقط
+  // ✅ المستحق يستبعد المصروف
   const remainingTotal = entriesView
-    .filter(e => e.type !== "expense") // exclude expenses
+    .filter(e => e.type !== "expense")
     .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
   el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(expensesTotal));
@@ -350,7 +359,6 @@ function applyEntryFilters(entriesView){
 
     const hitT = !ft || e.type === ft;
 
-    // ✅ expense always closed (remaining=0) فمش هيدخل في open أصلاً
     const hitO =
       !fo ||
       (fo === "open" && e.remaining > 0) ||
@@ -373,7 +381,6 @@ function renderEntriesTable(entriesView){
   for(const e of sorted){
     const cat = e.type === "expense" ? (e.category || "—") : "—";
 
-    // ✅ لو مصروف: نخلي زر إضافة دفعة Disabled عشان مايلخبطش
     const payBtn = (e.type === "expense")
       ? `<button class="btn small" type="button" disabled title="المصروف لا يحتاج دفعات">إضافة دفعة</button>`
       : `<button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>`;
@@ -473,7 +480,6 @@ function openEntryPreview(entryId){
     `تاريخ الإنشاء: ${new Date(entry.createdAt).toLocaleString("ar-EG")}`
   );
 
-  // ✅ للمصروف: ما نكتبش "عليه باقي"
   const statusText =
     (v.type === "expense")
       ? "الحالة: مصروف (ليس مستحق)"
@@ -488,28 +494,32 @@ function openEntryPreview(entryId){
   el("prevCat") && (el("prevCat").textContent = (v.type === "expense" ? (v.category || "—") : "—"));
   el("prevNotes") && (el("prevNotes").textContent = v.notes || "—");
   el("prevTotal") && (el("prevTotal").textContent = `${fmt(v.total)} ج.م`);
-
-  // ✅ للمصروف: باقي = 0
   el("prevPaidRemain") && (el("prevPaidRemain").textContent = `${fmt(v.paid)} / ${fmt(v.remaining)} ج.م`);
-
-  const pays = data.payments
-    .filter(p => p.entryId === entryId)
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const tb = el("prevPaysTbody");
   if(tb){
     tb.innerHTML = "";
-    if(pays.length === 0){
-      tb.innerHTML = `<tr><td colspan="3">لا توجد مدفوعات لهذه العملية.</td></tr>`;
-    }else{
-      for(const p of pays){
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${p.date || "—"}</td>
-          <td>${escapeHtml(p.note || "—")}</td>
-          <td class="num">${fmt(p.amount)}</td>
-        `;
-        tb.appendChild(tr);
+
+    // ✅ FINAL: المصروف لا نعرض له مدفوعات حتى لو قديمًا اتسجل بالغلط
+    if(v.type === "expense"){
+      tb.innerHTML = `<tr><td colspan="3">المصروف لا يحتوي على مدفوعات.</td></tr>`;
+    } else {
+      const pays = data.payments
+        .filter(p => p.entryId === entryId)
+        .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+
+      if(pays.length === 0){
+        tb.innerHTML = `<tr><td colspan="3">لا توجد مدفوعات لهذه العملية.</td></tr>`;
+      }else{
+        for(const p of pays){
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${p.date || "—"}</td>
+            <td>${escapeHtml(p.note || "—")}</td>
+            <td class="num">${fmt(p.amount)}</td>
+          `;
+          tb.appendChild(tr);
+        }
       }
     }
   }
@@ -541,7 +551,7 @@ function showLedger(name){
 
   const pays = paysAll
     .filter(p => (p.party || "").trim().toLowerCase().includes(q))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
   if(entries.length === 0 && pays.length === 0){
     box.innerHTML = `<div class="muted">لا توجد بيانات مطابقة.</div>`;
@@ -550,8 +560,6 @@ function showLedger(name){
 
   const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
   const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
-
-  // ✅ المتبقي: استبعاد المصروفات تلقائياً لأن remaining بتاعها 0 أصلاً
   const rem   = entries.reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
   box.innerHTML += `
@@ -699,11 +707,18 @@ document.addEventListener("DOMContentLoaded", () => {
       btnPrint.addEventListener("click", ()=> window.print());
     }
 
+    // ✅ firstPay: لو المستخدم كتب 0 يمسحه + لو اختار مصروف نخليه فاضي
     el("firstPay")?.addEventListener("input", ()=>{
       const v = el("firstPay").value;
       if(v !== "" && Number(v) <= 0) el("firstPay").value = "";
+      if(el("type")?.value === "expense") el("firstPay").value = "";
+    });
+    // ✅ لو النوع اتغير إلى مصروف: امسح الدفعة الأولى فورًا
+    el("type")?.addEventListener("change", ()=>{
+      if(el("type").value === "expense" && el("firstPay")) el("firstPay").value = "";
     });
 
+    // ✅ Add Entry
     el("entryForm")?.addEventListener("submit", (ev)=>{
       ev.preventDefault();
 
@@ -717,7 +732,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       addEntry(entry);
 
-      if(firstPay !== null){
+      // ✅ إضافة دفعة أولى فقط لو النوع ليس مصروف
+      if(firstPay !== null && entry.type !== "expense"){
         addPayment({
           id: uid(),
           entryId: entry.id,
@@ -743,6 +759,7 @@ document.addEventListener("DOMContentLoaded", () => {
     el("payQ")?.addEventListener("input", refresh);
     el("trashQ")?.addEventListener("input", refresh);
 
+    // ✅ Table actions
     el("tbody")?.addEventListener("click", (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
@@ -783,6 +800,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if(ev.target === el("payModal")) closePayModal();
     });
 
+    // ✅ Save payment (مع منع تجاوز الإجمالي)
     el("paySave")?.addEventListener("click", ()=>{
       const data = loadData();
       const entry = data.entries.find(e => e.id === CURRENT_PAY_ENTRY_ID);
@@ -802,6 +820,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // ✅ FINAL: منع الدفع أكثر من الإجمالي
+      const alreadyPaid = sumPaymentsForEntry(entry.id, data.payments);
+      if(Number.isFinite(entry.total) && (alreadyPaid + amount) > Number(entry.total) + 1e-9){
+        alert(`لا يمكن أن تتجاوز المدفوعات إجمالي العملية.\nالمدفوع حاليًا: ${fmt(alreadyPaid)}\nالإجمالي: ${fmt(entry.total)}`);
+        return;
+      }
+
       addPayment({
         id: uid(),
         entryId: entry.id,
@@ -816,6 +841,7 @@ document.addEventListener("DOMContentLoaded", () => {
       refresh();
     });
 
+    // ✅ Delete payment (PIN)
     el("payTbody")?.addEventListener("click", (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
