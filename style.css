@@ -220,7 +220,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
   backdrop-filter: blur(12px);
 }
 
-/* ✅ Center login box (requested) */
+/* ✅ Center login box */
 .gateShell{
   position:absolute; inset:0;
   display:flex;
@@ -376,3 +376,169 @@ input::placeholder{color: rgba(169,183,208,.7)}
 /* ✅ Fix hidden elements (important) */
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
+
+
+/* =========================================================
+   ✅ NEW: Preview / Print Styles (PDF via Print)
+   ========================================================= */
+
+/* صفحات المعاينة (هنستخدمها في index/app.js) */
+.previewWrap{
+  display:grid;
+  gap:12px;
+}
+.previewHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.previewHead h2{
+  margin:0;
+  font-size:16px;
+}
+.previewActions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* كارت المعاينة */
+.printCard{
+  background: linear-gradient(180deg, rgba(15,26,46,.92), rgba(12,22,41,.92));
+  border:1px solid var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding:14px;
+}
+.printHeader{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  border-bottom:1px solid rgba(255,255,255,.10);
+  padding-bottom:10px;
+  margin-bottom:10px;
+}
+.printHeader .title{
+  font-weight:900;
+  font-size:16px;
+}
+.printHeader .sub{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:4px;
+}
+.kvGrid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:10px;
+}
+@media (max-width: 560px){ .kvGrid{grid-template-columns:1fr} }
+.kv{
+  background: rgba(255,255,255,.05);
+  border:1px solid var(--stroke);
+  border-radius:14px;
+  padding:10px;
+}
+.kv .k{color:var(--muted); font-size:12px}
+.kv .v{margin-top:6px; font-weight:900}
+
+/* جدول صغير في المعاينة */
+.miniTable{
+  width:100%;
+  border-collapse:collapse;
+  overflow:hidden;
+  border-radius:14px;
+  border:1px solid var(--stroke);
+}
+.miniTable th, .miniTable td{
+  padding:10px 10px;
+  border-bottom:1px solid rgba(255,255,255,.10);
+  font-size:13px;
+  text-align:right;
+}
+.miniTable th{
+  background: rgba(255,255,255,.04);
+  color: rgba(231,238,252,.92);
+}
+.miniTable td.num{text-align:left}
+.miniMuted{color:var(--muted); font-size:12px; margin-top:8px}
+
+/* =========================================================
+   ✅ PRINT MODE (Save as PDF)
+   - نخفي الـHeader/Nav/Buttons
+   - نطلع ورقة نظيفة جاهزة للطباعة
+   ========================================================= */
+@media print{
+  /* خلفية بيضاء للطباعة */
+  body{
+    background:#fff !important;
+    color:#0f172a !important;
+  }
+
+  /* إخفاء عناصر واجهة التطبيق */
+  .topbar,
+  .navBar,
+  .footer2,
+  .btn,
+  .actions,
+  .filters,
+  .toolbar,
+  .pageHead,
+  .previewActions,
+  #pinGate,
+  #payModal{
+    display:none !important;
+  }
+
+  /* توسيع المحتوى */
+  .container{
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* كروت الطباعة بدون ظل */
+  .card,
+  .printCard{
+    box-shadow:none !important;
+    border:1px solid #e5e7eb !important;
+    background:#fff !important;
+    color:#0f172a !important;
+  }
+
+  .kv{
+    background:#fff !important;
+    border:1px solid #e5e7eb !important;
+  }
+  .kv .k{ color:#475569 !important; }
+  .miniTable{
+    border:1px solid #e5e7eb !important;
+  }
+  .miniTable th{
+    background:#f8fafc !important;
+    color:#0f172a !important;
+  }
+  .miniTable td, .miniTable th{
+    border-bottom:1px solid #e5e7eb !important;
+    color:#0f172a !important;
+  }
+
+  /* منع جدول السجل الكبير من كسر الصفحة بشكل سيء */
+  .tableWrap{
+    border:0 !important;
+    overflow:visible !important;
+  }
+  .table{
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* إلغاء sticky في الطباعة */
+  .table th{
+    position: static !important;
+  }
+}
