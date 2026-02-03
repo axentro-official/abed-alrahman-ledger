@@ -42,7 +42,7 @@ h1{margin:0; font-size:18px; line-height:1.1}
 
 .actions{display:flex; gap:8px; flex-wrap:wrap}
 
-/* ✅ NEW: admin tag (إدارة هيثم جنب الاسم بخط صغير) */
+/* ✅ admin tag (إدارة هيثم جنب الاسم بخط صغير) */
 .adminTag{
   display:inline-block;
   margin-inline-start:10px;
@@ -346,10 +346,9 @@ input::placeholder{color: rgba(169,183,208,.7)}
   background: rgba(11,18,32,.85);
   border-bottom:1px solid var(--stroke);
   position:sticky;
-  top: calc(14px + 42px + 14px); /* تقريباً ارتفاع الهيدر */
+  top: calc(14px + 42px + 14px);
   z-index:9;
 
-  /* ✅ NEW: على الموبايل لو التابات كتير يبقى سكرول */
   overflow-x:auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -357,8 +356,8 @@ input::placeholder{color: rgba(169,183,208,.7)}
 .navBar::-webkit-scrollbar{display:none}
 
 .navBtn{
-  flex: 0 0 auto;           /* ✅ NEW */
-  min-width: 140px;         /* ✅ NEW */
+  flex: 0 0 auto;
+  min-width: 140px;
   padding:10px;
   border-radius:14px;
   border:1px solid var(--stroke);
@@ -400,13 +399,13 @@ input::placeholder{color: rgba(169,183,208,.7)}
   font-weight:700;
 }
 
-/* ✅ Fix hidden elements (important) */
+/* ✅ Fix hidden elements */
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
 
 
 /* =========================================================
-   ✅ NEW: Preview / Print Styles (PDF via Print)
+   ✅ Preview / Print Styles
    ========================================================= */
 
 /* صفحات المعاينة */
@@ -495,14 +494,28 @@ input::placeholder{color: rgba(169,183,208,.7)}
 .miniMuted{color:var(--muted); font-size:12px; margin-top:8px}
 
 /* =========================================================
-   ✅ PRINT MODE (Save as PDF)
+   ✅ PRINT MODE (Save as PDF) — محسّن A4
    ========================================================= */
 @media print{
+  /* ✅ A4 + margins */
+  @page{
+    size: A4;
+    margin: 12mm;
+  }
+
+  html, body{
+    height:auto !important;
+  }
+
   body{
     background:#fff !important;
     color:#0f172a !important;
+    font-size: 12pt !important;
+    line-height: 1.35 !important;
+    direction: rtl !important;
   }
 
+  /* إخفاء عناصر واجهة التطبيق */
   .topbar,
   .navBar,
   .footer2,
@@ -518,12 +531,14 @@ input::placeholder{color: rgba(169,183,208,.7)}
     display:none !important;
   }
 
+  /* توسيع المحتوى */
   .container{
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
+  /* كروت الطباعة بدون ظل */
   .card,
   .printCard{
     box-shadow:none !important;
@@ -532,11 +547,25 @@ input::placeholder{color: rgba(169,183,208,.7)}
     color:#0f172a !important;
   }
 
+  .printHeader{
+    border-bottom: 1px solid #e5e7eb !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 10px !important;
+  }
+  .printHeader .title{
+    font-size: 14pt !important;
+  }
+  .printHeader .sub,
+  .miniMuted{
+    font-size: 10pt !important;
+  }
+
   .kv{
     background:#fff !important;
     border:1px solid #e5e7eb !important;
   }
   .kv .k{ color:#475569 !important; }
+
   .miniTable{
     border:1px solid #e5e7eb !important;
   }
@@ -547,8 +576,11 @@ input::placeholder{color: rgba(169,183,208,.7)}
   .miniTable td, .miniTable th{
     border-bottom:1px solid #e5e7eb !important;
     color:#0f172a !important;
+    padding: 8px 8px !important;
+    font-size: 10.5pt !important;
   }
 
+  /* ✅ السجل الكبير */
   .tableWrap{
     border:0 !important;
     overflow:visible !important;
@@ -556,9 +588,25 @@ input::placeholder{color: rgba(169,183,208,.7)}
   .table{
     min-width: 0 !important;
     width: 100% !important;
+    font-size: 10.5pt !important;
+  }
+  .table th, .table td{
+    padding: 7px 7px !important;
   }
 
+  /* إلغاء sticky في الطباعة */
   .table th{
     position: static !important;
+  }
+
+  /* ✅ منع انقسام الكروت بين الصفحات */
+  .card, .printCard, .kv, .tableWrap{
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ✅ لو صفحات المعاينة: خلّيها تملأ الورقة */
+  .previewWrap{
+    display:block !important;
   }
 }
