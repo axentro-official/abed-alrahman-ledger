@@ -9,6 +9,12 @@
       - منع دفعة أولى للمصروف
       - منع دفعة تتجاوز إجمالي العملية
       - معاينة المصروف لا تعرض مدفوعات
+
+   ✅ NEW (for next phase):
+      - تصنيف العمليات ماليًا: (فلوس ليا / فلوس عليا / مصروف)
+      - كشف حساب يدعم فلتر (عميل فقط / مورد فقط) عبر #ledgerMode إن وُجد
+      - الضغط على اسم الشخص يفتح كشف حساب تلقائيًا (fallback لتفاصيل الشخص)
+      - سجل المحذوفات: حذف نهائي لكل سطر مع PIN
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -72,6 +78,22 @@ function typeLabel(t){
   })[t] || "—";
 }
 
+/* ✅ تصنيف مالي (جاهز للـ KPI الجديد) */
+function moneySide(entryType){
+  if(entryType === "expense") return "expense";        // مصروف
+  if(entryType === "credit_supplier") return "payable"; // فلوس عليا
+  if(entryType === "credit_customer") return "receivable"; // فلوس ليا
+  if(entryType === "advance") return "receivable";     // سُلفة (فلوس ليا عند الشخص)
+  return "other";
+}
+function sideLabel(side){
+  return ({
+    receivable: "فلوس ليا",
+    payable: "فلوس عليا",
+    expense: "مصروف"
+  })[side] || "—";
+}
+
 function escapeHtml(str){
   return (str || "")
     .replaceAll("&", "&amp;")
@@ -94,12 +116,14 @@ function computeEntryView(entry, payments){
   const total = Number(entry.total);
   const paid = sumPaymentsForEntry(entry.id, payments);
 
+  const side = moneySide(entry.type);
+
   if(entry.type === "expense"){
-    return { ...entry, paid, remaining: 0 };
+    return { ...entry, side, paid, remaining: 0 };
   }
 
   const remaining = (Number.isFinite(total) ? Math.max(total - paid, 0) : NaN);
-  return { ...entry, paid, remaining };
+  return { ...entry, side, paid, remaining };
 }
 
 /* -------------------- Pages -------------------- */
@@ -226,6 +250,13 @@ function logTrash(event){
   saveTrash(t);
 }
 
+/* ✅ حذف نهائي لسطر في المحذوفات */
+function deleteTrashLogForever(logId){
+  const t = loadTrash();
+  t.logs = (t.logs || []).filter(x => x.id !== logId);
+  saveTrash(t);
+}
+
 /* -------------------- Forms -------------------- */
 function resetForm(){
   el("date") && (el("date").value = "");
@@ -326,22 +357,44 @@ function deletePaymentWithLog(payId){
 }
 
 /* -------------------- Render KPIs -------------------- */
-function renderKPIs(entriesView, payments){
+function computeTotals(entriesView, payments){
   const expensesTotal = entriesView
     .filter(e => e.type === "expense")
     .reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
 
   const paidTotal = payments.reduce((a,p)=> a + Number(p.amount || 0), 0);
 
-  // ✅ المستحق يستبعد المصروف
+  const remainingReceivable = entriesView
+    .filter(e => e.side === "receivable")
+    .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
+
+  const remainingPayable = entriesView
+    .filter(e => e.side === "payable")
+    .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
+
   const remainingTotal = entriesView
     .filter(e => e.type !== "expense")
     .reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
-  el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(expensesTotal));
-  el("kpiPaid") && (el("kpiPaid").textContent = fmt(paidTotal));
-  el("kpiRemaining") && (el("kpiRemaining").textContent = fmt(remainingTotal));
+  return { expensesTotal, paidTotal, remainingReceivable, remainingPayable, remainingTotal };
+}
+
+function renderKPIs(entriesView, payments){
+  const t = computeTotals(entriesView, payments);
+
+  // الموجود حاليًا في HTML:
+  // kpiExpenses = مصروفات
+  // kpiPaid     = إجمالي المدفوعات
+  // kpiRemaining= إجمالي المستحق (حالياً إجمالي المتبقي لكل ما ليس مصروف)
+  // kpiCount    = عدد العمليات
+  el("kpiExpenses") && (el("kpiExpenses").textContent = fmt(t.expensesTotal));
+  el("kpiPaid") && (el("kpiPaid").textContent = fmt(t.paidTotal));
+  el("kpiRemaining") && (el("kpiRemaining").textContent = fmt(t.remainingTotal));
   el("kpiCount") && (el("kpiCount").textContent = entriesView.length.toLocaleString("ar-EG"));
+
+  // ✅ جاهز للمرحلة الجاية: لو زودنا IDs جديدة في HTML
+  // el("kpiReceivable") && (el("kpiReceivable").textContent = fmt(t.remainingReceivable));
+  // el("kpiPayable") && (el("kpiPayable").textContent = fmt(t.remainingPayable));
 }
 
 /* -------------------- Filters -------------------- */
@@ -385,11 +438,18 @@ function renderEntriesTable(entriesView){
       ? `<button class="btn small" type="button" disabled title="المصروف لا يحتاج دفعات">إضافة دفعة</button>`
       : `<button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>`;
 
+    // ✅ الاسم clickable → يفتح كشف الحساب تلقائيًا (fallback لتفاصيل الشخص)
+    const partyCell = `
+      <button class="btn small ghost" data-act="person" data-name="${escapeHtml(e.party || "")}" data-side="${e.side}">
+        ${escapeHtml(e.party || "")}
+      </button>
+    `;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${e.date || "—"}</td>
       <td><span class="badge">${typeLabel(e.type)}</span></td>
-      <td>${escapeHtml(e.party || "")}</td>
+      <td>${partyCell}</td>
       <td>${escapeHtml(e.desc || "")}</td>
       <td>${escapeHtml(cat)}</td>
       <td class="num">${fmt(e.total)}</td>
@@ -527,8 +587,26 @@ function openEntryPreview(entryId){
   showPage("entryPreview");
 }
 
-/* -------------------- Ledger: Partial Search + Live -------------------- */
+/* -------------------- Ledger: Partial Search + Live + Mode -------------------- */
 let ledgerTimer = null;
+
+function getLedgerMode(){
+  // ✅ هنضيفه في HTML بعدين، لكن لو موجود دلوقتي يشتغل فورًا
+  const m = (el("ledgerMode")?.value || "all").trim();
+  return (m === "customer" || m === "supplier" || m === "all") ? m : "all";
+}
+
+function entryMatchesLedgerMode(entry, mode){
+  if(mode === "all") return true;
+
+  // customer = فلوس ليا (عميل + سلفة)
+  if(mode === "customer") return entry.side === "receivable";
+
+  // supplier = فلوس عليا (مورد)
+  if(mode === "supplier") return entry.side === "payable";
+
+  return true;
+}
 
 function showLedger(name){
   const box = el("ledgerBox");
@@ -541,17 +619,24 @@ function showLedger(name){
     return;
   }
 
+  const mode = getLedgerMode();
+
   const data = loadData();
   const entriesAll = data.entries.map(e => computeEntryView(e, data.payments));
   const paysAll = data.payments;
 
   const entries = entriesAll
     .filter(e => (e.party || "").trim().toLowerCase().includes(q))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .filter(e => entryMatchesLedgerMode(e, mode))
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
+
+  // المدفوعات: نعرضها فقط لو مرتبطة بعمليات ضمن نفس الفلتر (حتى لا تلخبط)
+  const allowedEntryIds = new Set(entries.map(e => e.id));
 
   const pays = paysAll
     .filter(p => (p.party || "").trim().toLowerCase().includes(q))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
+    .filter(p => allowedEntryIds.has(p.entryId))
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt));
 
   if(entries.length === 0 && pays.length === 0){
     box.innerHTML = `<div class="muted">لا توجد بيانات مطابقة.</div>`;
@@ -562,8 +647,13 @@ function showLedger(name){
   const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
   const rem   = entries.reduce((a,e)=> a + (Number.isFinite(e.remaining) ? e.remaining : 0), 0);
 
+  const headerMode =
+    mode === "customer" ? " (عملاء فقط)" :
+    mode === "supplier" ? " (موردين فقط)" :
+    "";
+
   box.innerHTML += `
-    <div class="line"><b>الإجمالي</b><b>${fmt(total)}</b></div>
+    <div class="line"><b>الإجمالي${headerMode}</b><b>${fmt(total)}</b></div>
     <div class="line"><span>المدفوع</span><b>${fmt(paid)}</b></div>
     <div class="line"><span>المتبقي</span><b>${fmt(rem)}</b></div>
   `;
@@ -575,6 +665,7 @@ function showLedger(name){
         <div style="max-width:70%">
           <div><b>${escapeHtml(e.party || "—")}</b></div>
           <div class="muted">${e.date || "—"} • ${typeLabel(e.type)} • ${escapeHtml(e.desc || "—")}</div>
+          <div class="muted">الجهة المالية: ${sideLabel(e.side)}</div>
           <div class="muted">ملاحظات: ${escapeHtml(e.notes || "—")}</div>
         </div>
         <div style="text-align:left; min-width: 140px">
@@ -601,6 +692,28 @@ function showLedger(name){
         </div>
       `;
     }
+  }
+}
+
+/* ✅ فتح “تفاصيل شخص” (fallback لكشف حساب لحد ما نبني صفحة التفاصيل) */
+function openPersonDetails(name, side = "all"){
+  const clean = (name || "").trim();
+  if(!clean) return;
+
+  // لو صفحة تفاصيل الشخص اتضافت بعدين هنستخدمها
+  // حالياً: نعمل fallback لكشف الحساب مباشرة
+  showPage("ledger");
+  if(el("ledgerName")){
+    el("ledgerName").value = clean;
+
+    // لو في ledgerMode: نضبطه حسب side
+    if(el("ledgerMode")){
+      if(side === "payable") el("ledgerMode").value = "supplier";
+      else if(side === "receivable") el("ledgerMode").value = "customer";
+      else el("ledgerMode").value = "all";
+    }
+
+    showLedger(clean);
   }
 }
 
@@ -658,7 +771,9 @@ function renderTrash(){
       <td>${escapeHtml(party)}</td>
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
-      <td>—</td>
+      <td>
+        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
@@ -785,6 +900,13 @@ document.addEventListener("DOMContentLoaded", () => {
         openEntryPreview(id);
         return;
       }
+
+      if(act === "person"){
+        const name = btn.dataset.name || "";
+        const side = btn.dataset.side || "all";
+        openPersonDetails(name, side);
+        return;
+      }
     });
 
     // ✅ Preview buttons
@@ -855,6 +977,20 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    // ✅ Trash: delete forever per row (PIN)
+    el("trashTbody")?.addEventListener("click", (ev)=>{
+      const btn = ev.target.closest("button");
+      if(!btn) return;
+      const logId = btn.dataset.trashdel;
+      if(!logId) return;
+
+      if(!requirePin("الحذف النهائي من سجل المحذوفات")) return;
+      if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
+        deleteTrashLogForever(logId);
+        renderTrash();
+      }
+    });
+
     // ✅ Ledger live search
     el("ledgerName")?.addEventListener("input", ()=>{
       clearTimeout(ledgerTimer);
@@ -864,6 +1000,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     el("btnLedger")?.addEventListener("click", ()=> showLedger(el("ledgerName").value));
+
+    // ✅ لو أضفت ledgerMode في HTML: غير الفلتر ينعكس فوراً
+    el("ledgerMode")?.addEventListener("change", ()=>{
+      showLedger(el("ledgerName")?.value || "");
+    });
 
   }catch(e){
     alert("فيه خطأ حصل في تشغيل الصفحة. امسح كاش الموقع وافتح تاني.");
