@@ -1,372 +1,450 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>سوبر ماركت أولاد يحيى — دفتر الحسابات</title>
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- ✅ Google Sheets / Apps Script Config (الأحدث) -->
+  <script>
+    window.AXENTRO_API = {
+      // ✅ ده اللينك اللي فتح معاك JSON من /exec
+      scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
+      pin: "1234"
+    };
+  </script>
 </head>
 
 <body>
-  <!-- ✅ PIN Gate -->
+  <!-- ✅ PIN GATE -->
   <div id="pinGate" class="gate">
     <div class="gateShell">
       <div class="gateWrap">
         <div class="gateCard2">
           <div class="gateHead2">
-            <div class="gateAvatar">OY</div>
+            <div class="gateAvatar">أ</div>
             <div class="gateTitleWrap">
               <div class="gateTitle">سوبر ماركت أولاد يحيى</div>
-              <div class="gateSub">دفتر الحسابات — دخول الإدارة</div>
+              <div class="gateSub">إدارة هيثم</div>
             </div>
           </div>
 
           <form id="pinForm" class="gateForm2">
             <label class="pinLbl">PIN</label>
+
             <div class="pinInputWrap">
-              <input id="pinInput" class="pinInput" type="password" inputmode="numeric" placeholder="••••" autocomplete="one-time-code" />
-              <button id="pinToggle" class="pinToggle" type="button">إظهار</button>
+              <input id="pinInput" class="pinInput" type="password" inputmode="numeric"
+                     placeholder="ادخل PIN هنا" maxlength="8" />
+              <button id="pinToggle" class="pinToggle" type="button" aria-label="إظهار/إخفاء PIN">👁</button>
             </div>
+
+            <div class="help">التعليمات: اكتب الرقم السري ثم اضغط “دخول”.</div>
 
             <button class="btnPin" type="submit">دخول</button>
+            <div id="pinError" class="error" hidden>PIN غير صحيح.</div>
 
-            <div id="pinError" class="error" hidden>
-              PIN غير صحيح. حاول مرة أخرى.
-            </div>
-
-            <div class="warnLine">
-              ملاحظة: تسجيل الدخول يحفظ جلسة على نفس الجهاز فقط.
-            </div>
+            <div class="warnLine">⚠️ تنبيه: هذه الصفحة للإدارة فقط وليست للعملاء.</div>
           </form>
         </div>
 
+        <!-- ✅ Footer داخل اللوجين (زي ما كان) -->
         <div class="gateFooter">
-          <div>© سوبر ماركت أولاد يحيى</div>
-          <div class="gateFooterMuted">إدارة هيثم</div>
+          <div>© Axentro — All Rights Reserved 2024</div>
+          <div class="gateFooterMuted">By Ahmed Hamouda</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ✅ Header -->
+  <!-- ✅ APP HEADER -->
   <header class="topbar">
     <div class="brand">
-      <div class="logo">OY</div>
+      <div class="logo">أ</div>
       <div>
-        <h1>سوبر ماركت أولاد يحيى <span class="adminTag">إدارة هيثم</span></h1>
-        <p>دفتر الحسابات — عمليات + مدفوعات + كشف حساب + تقارير</p>
+        <h1>
+          سوبر ماركت أولاد يحيى
+          <span class="adminTag">إدارة هيثم</span>
+        </h1>
+        <p>مصاريف • سلف • آجل • موردين • مدفوعات منفصلة</p>
       </div>
     </div>
 
+    <!-- ✅ الهيدر: زر طباعة + تسجيل خروج فقط -->
     <div class="actions">
-      <button id="btnPrint" class="btn small ghost" type="button">طباعة / PDF</button>
-      <button id="btnLogout" class="btn small danger" type="button">خروج</button>
+      <button id="btnPrint" class="btn ghost" type="button">طباعة</button>
+      <button id="btnLogout" class="btn danger" type="button">تسجيل خروج</button>
     </div>
   </header>
 
-  <!-- ✅ NAV -->
-  <nav id="navBar" class="navBar" hidden>
-    <button class="navBtn active" data-page="dashboard" type="button">لوحة التحكم</button>
-    <button class="navBtn" data-page="records" type="button">العمليات</button>
-    <button class="navBtn" data-page="payments" type="button">المدفوعات</button>
-    <button class="navBtn" data-page="ledger" type="button">كشف حساب</button>
-    <button class="navBtn" data-page="reports" type="button">تقارير</button>
-    <button class="navBtn" data-page="trash" type="button">المحذوفات</button>
+  <!-- ✅ NAV (Tabs) -->
+  <nav class="navBar" id="navBar" hidden>
+    <button class="navBtn active" data-page="dashboard">🏠 الرئيسية</button>
+    <button class="navBtn" data-page="records">📒 السجل</button>
+    <button class="navBtn" data-page="payments">💳 المدفوعات</button>
+    <button class="navBtn" data-page="ledger">📊 كشف حساب</button>
+    <button class="navBtn" data-page="reports">📈 التقارير</button>
+    <button class="navBtn" data-page="trash">🗑️ المحذوفات</button>
   </nav>
 
-  <!-- ✅ App Root -->
-  <main id="appRoot" class="container" hidden>
+  <main class="container" id="appRoot" hidden>
 
-    <!-- ✅ Dashboard -->
+    <!-- ✅ PAGE: DASHBOARD -->
     <section id="page-dashboard" class="page">
       <div class="grid">
         <div class="card">
-          <h2>مؤشرات سريعة</h2>
+          <h2>ملخص سريع</h2>
+
           <div class="kpis">
-            <div class="kpi"><span class="label">إجمالي المصروفات</span><span id="kpiExpenses" class="value">0.00</span></div>
-            <div class="kpi"><span class="label">إجمالي المدفوعات (خارجة)</span><span id="kpiPaid" class="value">0.00</span></div>
-            <div class="kpi"><span class="label">المتبقي (فلوس ليا)</span><span id="kpiReceivable" class="value">0.00</span></div>
-            <div class="kpi"><span class="label">المتبقي (فلوس عليا)</span><span id="kpiPayable" class="value">0.00</span></div>
-            <div class="kpi"><span class="label">عدد العمليات</span><span id="kpiCount" class="value">0</span></div>
+            <div class="kpi">
+              <span class="label">إجمالي المصروفات</span>
+              <span id="kpiExpenses" class="value">—</span>
+            </div>
+
+            <div class="kpi">
+              <span class="label">إجمالي المدفوعات</span>
+              <span id="kpiPaid" class="value">—</span>
+            </div>
+
+            <div class="kpi">
+              <span class="label">فلوس ليا (عملاء + سلف)</span>
+              <span id="kpiReceivable" class="value">—</span>
+            </div>
+
+            <div class="kpi">
+              <span class="label">فلوس عليا (موردين)</span>
+              <span id="kpiPayable" class="value">—</span>
+            </div>
+
+            <div class="kpi">
+              <span class="label">عدد العمليات</span>
+              <span id="kpiCount" class="value">—</span>
+            </div>
           </div>
+
+          <p class="hint" style="margin-top:10px">
+            * “فلوس ليا” = آجل عميل + سُلفة. — “فلوس عليا” = فواتير موردين. — المصروفات ليست مستحقات.
+          </p>
         </div>
 
-        <div class="card form">
+        <div class="card">
           <h2>إضافة عملية جديدة</h2>
-          <form id="entryForm">
+
+          <form id="entryForm" class="form">
             <div class="row">
               <div class="field">
                 <label>التاريخ</label>
                 <input id="date" type="date" />
+                <div class="help">التعليمات: اختار تاريخ العملية.</div>
               </div>
+
               <div class="field">
                 <label>النوع</label>
                 <select id="type">
-                  <option value="">— اختر —</option>
+                  <option value="" selected>— اختر —</option>
                   <option value="expense">مصروف</option>
                   <option value="advance">سُلفة</option>
                   <option value="credit_customer">آجل (عميل)</option>
-                  <option value="credit_supplier">فاتورة/مورد</option>
+                  <option value="credit_supplier">فاتورة/مورد (تاجر)</option>
                 </select>
+                <div class="help">التعليمات: اختر نوع العملية لتظهر في التقارير بشكل صحيح.</div>
               </div>
             </div>
 
             <div class="row">
               <div class="field">
-                <label>الاسم/الجهة</label>
-                <input id="party" placeholder="مثال: أحمد / شركة X" />
+                <label>الاسم / الجهة</label>
+                <input id="party" type="text" placeholder="مثال: أحمد / عميل محمد / مورد الشروق" />
+                <div class="help">التعليمات: اكتب اسم الشخص أو الجهة.</div>
               </div>
+
               <div class="field">
-                <label>الوصف</label>
-                <input id="desc" placeholder="مثال: توريد / سلفة / فاتورة..." />
+                <label>وصف العملية</label>
+                <input id="desc" type="text" placeholder="مثال: إيجار فبراير / بضاعة آجلة / سلفة عامل" />
+                <div class="help">التعليمات: وصف مختصر يسهل عليك البحث بعدين.</div>
               </div>
             </div>
 
             <div class="row">
               <div class="field">
-                <label>تصنيف المصروف</label>
-                <select id="category">
-                  <option value="">— اختر —</option>
-                  <option value="كهرباء">كهرباء</option>
-                  <option value="مياه">مياه</option>
-                  <option value="مرتبات">مرتبات</option>
-                  <option value="إيجار">إيجار</option>
-                  <option value="صيانة">صيانة</option>
-                  <option value="أخرى">أخرى</option>
-                </select>
-                <div class="help">التصنيف مطلوب فقط للمصروف.</div>
+                <label>الإجمالي (جنيه)</label>
+                <input id="total" type="number" min="0" step="0.01" placeholder="مثال: 1500" />
+                <div class="help">التعليمات: اكتب إجمالي المبلغ (رقم أكبر من صفر).</div>
               </div>
-              <div class="field">
-                <label>الإجمالي</label>
-                <input id="total" type="number" step="0.01" placeholder="0.00" />
-              </div>
-            </div>
 
-            <div class="row">
               <div class="field">
                 <label>دفعة أولى (اختياري)</label>
-                <input id="firstPay" type="number" step="0.01" placeholder="0.00" />
-                <div class="help">للعميل/المورد/السلفة فقط — المصروف لا يقبل دفعات.</div>
-              </div>
-              <div class="field">
-                <label>ملاحظات</label>
-                <input id="notes" placeholder="أي ملاحظة..." />
+                <input id="firstPay" type="number" min="0" step="0.01" placeholder="مثال: 300" />
+                <div class="help">التعليمات: لو تم دفع جزء الآن، اكتب المبلغ. لو لا، سيبها فاضية.</div>
               </div>
             </div>
 
-            <div class="toolbar">
-              <div class="hint">البيانات تُحفظ على الشيت + كاش محلي احتياطي.</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button id="btnReset" class="btn ghost" type="button">مسح</button>
-                <button class="btn primary" type="submit">حفظ العملية</button>
+            <div class="row">
+              <div class="field">
+                <label>تصنيف (للمصاريف فقط)</label>
+                <select id="category">
+                  <option value="" selected>—</option>
+                  <option>مرتبات</option>
+                  <option>إيجار</option>
+                  <option>كهرباء</option>
+                  <option>مياه</option>
+                  <option>إنترنت</option>
+                  <option>نثريات</option>
+                  <option>صيانة</option>
+                  <option>نقل</option>
+                  <option>أخرى</option>
+                </select>
+                <div class="help">التعليمات: لو النوع “مصروف” اختار تصنيف، غير كده سيبه —.</div>
+              </div>
+
+              <div class="field">
+                <label>ملاحظات (اختياري)</label>
+                <input id="notes" type="text" placeholder="أي تفاصيل إضافية" />
+                <div class="help">التعليمات: اكتب أي ملاحظة (اختياري).</div>
               </div>
             </div>
+
+            <div class="row">
+              <button class="btn primary" type="submit">حفظ العملية</button>
+              <button id="btnReset" class="btn" type="button">مسح الحقول</button>
+            </div>
+
+            <p class="hint">
+              ملحوظة: المدفوعات بتتسجل في “سجل المدفوعات” منفصل. (المتبقي = الإجمالي - مجموع المدفوعات).
+            </p>
           </form>
         </div>
       </div>
     </section>
 
-    <!-- ✅ Records -->
+    <!-- ✅ PAGE: RECORDS -->
     <section id="page-records" class="page" hidden>
       <div class="pageHead">
-        <h2>العمليات</h2>
-        <div class="filters">
-          <input id="q" placeholder="بحث بالاسم/الوصف/الملاحظات..." />
-          <select id="filterType">
-            <option value="">كل الأنواع</option>
-            <option value="expense">مصروف</option>
-            <option value="advance">سُلفة</option>
-            <option value="credit_customer">آجل (عميل)</option>
-            <option value="credit_supplier">فاتورة/مورد</option>
-          </select>
-          <select id="filterOpen">
-            <option value="">الكل</option>
-            <option value="open">مفتوح</option>
-            <option value="closed">مقفول</option>
-          </select>
-        </div>
+        <h2>السجل</h2>
       </div>
 
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>التاريخ</th>
-              <th>النوع</th>
-              <th>الاسم</th>
-              <th>الوصف</th>
-              <th>التصنيف</th>
-              <th class="num">الإجمالي</th>
-              <th class="num">المدفوع</th>
-              <th class="num">المتبقي</th>
-              <th>إجراءات</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
+      <div class="card">
+        <div class="toolbar">
+          <div class="filters">
+            <input id="q" type="search" placeholder="بحث بالاسم / الوصف / الملاحظات..." />
+            <select id="filterType">
+              <option value="">كل الأنواع</option>
+              <option value="expense">مصروف</option>
+              <option value="advance">سُلفة</option>
+              <option value="credit_customer">آجل (عميل)</option>
+              <option value="credit_supplier">فاتورة/مورد</option>
+            </select>
+            <select id="filterOpen">
+              <option value="">الكل</option>
+              <option value="open">عليه باقي فقط</option>
+              <option value="closed">مقفول (مدفوع بالكامل)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الاسم/الجهة</th>
+                <th>الوصف</th>
+                <th>تصنيف</th>
+                <th class="num">إجمالي (ج.م)</th>
+                <th class="num">مدفوع (ج.م)</th>
+                <th class="num">باقي (ج.م)</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <!-- ✅ Payments -->
+    <!-- ✅ PAGE: PAYMENTS -->
     <section id="page-payments" class="page" hidden>
       <div class="pageHead">
-        <h2>المدفوعات</h2>
-        <div class="filters">
-          <input id="payQ" placeholder="بحث بالاسم/ملاحظة/اتجاه..." />
-        </div>
+        <h2>سجل المدفوعات</h2>
       </div>
 
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>التاريخ</th>
-              <th>الاسم</th>
-              <th>مرجع</th>
-              <th class="num">المبلغ</th>
-              <th>ملاحظة</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody id="payTbody"></tbody>
-        </table>
+      <div class="card">
+        <div class="toolbar">
+          <div class="filters">
+            <input id="payQ" type="search" placeholder="بحث في المدفوعات بالاسم/ملاحظة..." />
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>تاريخ الدفع</th>
+                <th>الاسم/الجهة</th>
+                <th>تابع لعملية</th>
+                <th class="num">المبلغ (ج.م)</th>
+                <th>ملاحظة</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="payTbody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <!-- ✅ Ledger -->
+    <!-- ✅ PAGE: LEDGER -->
     <section id="page-ledger" class="page" hidden>
       <div class="pageHead">
         <h2>كشف حساب</h2>
-        <div class="ledger">
-          <select id="ledgerMode">
-            <option value="all">الكل</option>
-            <option value="customer">عملاء فقط</option>
-            <option value="supplier">موردين فقط</option>
-          </select>
-          <input id="ledgerName" placeholder="اكتب اسم الشخص..." />
-          <button id="btnLedger" class="btn" type="button">عرض</button>
-          <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
-        </div>
       </div>
 
-      <div id="ledgerBox" class="ledgerBox"></div>
+      <div class="card">
+        <div class="ledger">
+          <select id="ledgerMode">
+            <option value="all" selected>الكل</option>
+            <option value="customer">عملاء فقط (فلوس ليا)</option>
+            <option value="supplier">موردين فقط (فلوس عليا)</option>
+          </select>
+
+          <input id="ledgerName" type="text" placeholder="اكتب الاسم (جزء من الاسم يكفي)..." />
+          <button id="btnLedger" class="btn" type="button">عرض</button>
+          <button id="btnLedgerPreview" class="btn ghost" type="button">معاينة</button>
+          <div id="ledgerBox" class="ledgerBox"></div>
+        </div>
+      </div>
     </section>
 
-    <!-- ✅ Reports -->
+    <!-- ✅ PAGE: REPORTS -->
     <section id="page-reports" class="page" hidden>
+      <div class="pageHead">
+        <h2>التقارير</h2>
+      </div>
+
       <div class="card">
-        <div class="repToolbar">
-          <div class="repFilters">
-            <div class="field sm">
-              <label>المدى</label>
-              <select id="repRangePreset">
-                <option value="custom">مخصص</option>
-                <option value="today">اليوم</option>
-                <option value="last_7">آخر 7 أيام</option>
-                <option value="last_30">آخر 30 يوم</option>
-                <option value="this_month">هذا الشهر</option>
-                <option value="this_year">هذا العام</option>
-              </select>
-            </div>
+        <div class="toolbar">
+          <div class="filters">
+            <select id="repRangePreset">
+              <option value="today">اليوم</option>
+              <option value="this_month">الشهر الحالي</option>
+              <option value="this_year">السنة الحالية</option>
+              <option value="last_7">آخر 7 أيام</option>
+              <option value="last_30">آخر 30 يوم</option>
+              <option value="custom" selected>فترة مخصصة</option>
+            </select>
 
-            <div class="field sm">
-              <label>من</label>
-              <input id="repFrom" type="date" />
-            </div>
-            <div class="field sm">
-              <label>إلى</label>
-              <input id="repTo" type="date" />
-            </div>
+            <input id="repFrom" type="date" />
+            <input id="repTo" type="date" />
 
-            <div class="field lg">
-              <label>بحث (اسم/وصف/ملاحظات)</label>
-              <input id="repParty" placeholder="اختياري" />
-            </div>
+            <select id="repType">
+              <option value="all" selected>كل الأنواع</option>
+              <option value="expense">مصاريف</option>
+              <option value="advance">سُلف</option>
+              <option value="credit_customer">عملاء آجل (فلوس ليا)</option>
+              <option value="credit_supplier">موردين (فلوس عليا)</option>
+              <option value="payments_out">مدفوعات خارجة (دفعت أنا)</option>
+              <option value="receipts_in">متحصلات داخلة (اتدفعتلي أنا)</option>
+            </select>
 
-            <div class="field sm">
-              <label>نوع التقرير</label>
-              <select id="repType">
-                <option value="all">كل العمليات</option>
-                <option value="expense">مصروفات</option>
-                <option value="advance">سُلف</option>
-                <option value="credit_customer">آجل (عملاء)</option>
-                <option value="credit_supplier">فاتورة/مورد</option>
-                <option value="payments_out">مدفوعات خارجة فقط</option>
-                <option value="receipts_in">متحصلات داخلة فقط</option>
-              </select>
-            </div>
-          </div>
+            <input id="repParty" type="search" placeholder="فلتر بالاسم/الجهة (اختياري)..." />
 
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="btnRunReports" class="btn" type="button">تحديث</button>
+            <button id="btnRunReports" class="btn" type="button">تطبيق</button>
             <button id="btnPrintReports" class="btn ghost" type="button">طباعة / PDF</button>
           </div>
         </div>
 
-        <div class="repKpis">
-          <div class="kpi"><span class="label">عدد العمليات</span><span id="repKpiEntries" class="value">0</span></div>
-          <div class="kpi"><span class="label">إجمالي المدفوعات (حسب الفلاتر)</span><span id="repKpiPays" class="value">0.00</span></div>
-          <div class="kpi"><span class="label">المتبقي (فلوس ليا)</span><span id="repKpiReceivable" class="value">0.00</span></div>
-          <div class="kpi"><span class="label">المتبقي (فلوس عليا)</span><span id="repKpiPayable" class="value">0.00</span></div>
+        <div class="kpis" style="margin-top:12px">
+          <div class="kpi">
+            <span class="label">إجمالي العمليات داخل الفترة</span>
+            <span id="repKpiEntries" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي المدفوعات داخل الفترة</span>
+            <span id="repKpiPays" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي (فلوس ليا) داخل الفترة</span>
+            <span id="repKpiReceivable" class="value">—</span>
+          </div>
+          <div class="kpi">
+            <span class="label">إجمالي (فلوس عليا) داخل الفترة</span>
+            <span id="repKpiPayable" class="value">—</span>
+          </div>
         </div>
 
-        <div class="repSplit">
-          <div>
-            <div class="repTitle">
-              <h3>العمليات</h3>
-              <span class="muted">حسب الفلاتر</span>
-            </div>
+        <div class="tableWrap" style="margin-top:12px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الاسم/الجهة</th>
+                <th>الوصف</th>
+                <th class="num">الإجمالي</th>
+                <th class="num">المدفوع</th>
+                <th class="num">الباقي</th>
+              </tr>
+            </thead>
+            <tbody id="repEntriesTbody"></tbody>
+          </table>
+        </div>
 
-            <div class="tableWrap">
-              <table class="table repTable">
-                <thead>
-                  <tr>
-                    <th>التاريخ</th>
-                    <th>النوع</th>
-                    <th>الاسم</th>
-                    <th>الوصف</th>
-                    <th class="num">الإجمالي</th>
-                    <th class="num">المدفوع</th>
-                    <th class="num">المتبقي</th>
-                  </tr>
-                </thead>
-                <tbody id="repEntriesTbody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <div class="repTitle">
-              <h3>المدفوعات</h3>
-              <span class="muted">حسب الفلاتر</span>
-            </div>
-
-            <div class="tableWrap">
-              <table class="table repTable">
-                <thead>
-                  <tr>
-                    <th>التاريخ</th>
-                    <th>الاسم</th>
-                    <th>تفاصيل</th>
-                    <th class="num">المبلغ</th>
-                  </tr>
-                </thead>
-                <tbody id="repPaysTbody"></tbody>
-              </table>
-            </div>
-          </div>
+        <div class="tableWrap" style="margin-top:12px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>تاريخ الدفع</th>
+                <th>الاسم/الجهة</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody id="repPaysTbody"></tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <!-- ✅ Entry Preview -->
+    <!-- ✅ PAGE: TRASH -->
+    <section id="page-trash" class="page" hidden>
+      <div class="pageHead">
+        <h2>سجل المحذوفات</h2>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="filters">
+            <input id="trashQ" type="search" placeholder="بحث في المحذوفات بالاسم/الوصف..." />
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>وقت الحذف</th>
+                <th>النوع</th>
+                <th>الاسم/الجهة</th>
+                <th class="num">المبلغ</th>
+                <th>سبب</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="trashTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ PAGE: ENTRY PREVIEW -->
     <section id="page-entryPreview" class="page" hidden>
       <div class="previewWrap">
         <div class="previewHead">
-          <h2>معاينة عملية</h2>
+          <h2>معاينة العملية</h2>
           <div class="previewActions">
-            <button class="btn ghost" type="button" onclick="history.back()">رجوع</button>
-            <button class="btn primary" type="button" onclick="window.print()">طباعة / PDF</button>
+            <button id="btnPrintEntry" class="btn ghost" type="button">طباعة / PDF</button>
+            <button id="btnBackFromEntryPreview" class="btn" type="button">رجوع</button>
           </div>
         </div>
 
@@ -374,163 +452,160 @@
           <div class="printHeader">
             <div>
               <div class="title">سوبر ماركت أولاد يحيى</div>
-              <div id="prevEntryMeta" class="sub">—</div>
-              <div id="prevEntryStatus" class="sub">—</div>
+              <div class="sub">إدارة هيثم</div>
+              <div class="miniMuted" id="prevEntryMeta">—</div>
             </div>
-            <div class="sub">إدارة هيثم</div>
+            <div class="miniMuted" id="prevEntryStatus">—</div>
           </div>
 
           <div class="kvGrid">
             <div class="kv"><div class="k">التاريخ</div><div class="v" id="prevDate">—</div></div>
             <div class="kv"><div class="k">النوع</div><div class="v" id="prevType">—</div></div>
-            <div class="kv"><div class="k">الاسم</div><div class="v" id="prevParty">—</div></div>
+            <div class="kv"><div class="k">الاسم/الجهة</div><div class="v" id="prevParty">—</div></div>
             <div class="kv"><div class="k">الوصف</div><div class="v" id="prevDesc">—</div></div>
             <div class="kv"><div class="k">التصنيف</div><div class="v" id="prevCat">—</div></div>
             <div class="kv"><div class="k">ملاحظات</div><div class="v" id="prevNotes">—</div></div>
             <div class="kv"><div class="k">الإجمالي</div><div class="v" id="prevTotal">—</div></div>
-            <div class="kv"><div class="k">مدفوع / متبقي</div><div class="v" id="prevPaidRemain">—</div></div>
+            <div class="kv"><div class="k">مدفوع / باقي</div><div class="v" id="prevPaidRemain">—</div></div>
           </div>
 
-          <div class="miniMuted">المدفوعات المرتبطة بالعملية:</div>
-          <table class="miniTable">
+          <div class="miniMuted" style="margin-top:12px">المدفوعات التابعة:</div>
+          <table class="miniTable" style="margin-top:8px">
             <thead>
-              <tr><th>التاريخ</th><th>ملاحظة</th><th class="num">المبلغ</th></tr>
+              <tr>
+                <th>التاريخ</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
             </thead>
             <tbody id="prevPaysTbody"></tbody>
           </table>
 
-          <div class="printFooter">
-            <div class="pfText">
-              <div><b>سوبر ماركت أولاد يحيى</b></div>
-              <div class="muted">إدارة هيثم • طباعة من النظام</div>
-            </div>
-            <img src="./qr.png" alt="QR" />
-          </div>
+          <div class="miniMuted">* للطباعة اختر Print → Save as PDF</div>
         </div>
       </div>
     </section>
 
-    <!-- ✅ Ledger Preview -->
+    <!-- ✅ PAGE: LEDGER PREVIEW -->
     <section id="page-ledgerPreview" class="page" hidden>
       <div class="previewWrap">
         <div class="previewHead">
-          <h2>معاينة كشف حساب</h2>
+          <h2>معاينة كشف الحساب</h2>
           <div class="previewActions">
-            <button class="btn ghost" type="button" onclick="history.back()">رجوع</button>
-            <button class="btn primary" type="button" onclick="window.print()">طباعة / PDF</button>
+            <button id="btnPrintLedger" class="btn ghost" type="button">طباعة / PDF</button>
+            <button id="btnBackFromLedgerPreview" class="btn" type="button">رجوع</button>
           </div>
         </div>
 
         <div class="printCard">
           <div class="printHeader">
             <div>
-              <div class="title">كشف حساب</div>
-              <div id="prevLedgerMeta" class="sub">—</div>
-              <div id="prevLedgerSummary" class="sub">—</div>
+              <div class="title">سوبر ماركت أولاد يحيى</div>
+              <div class="sub">إدارة هيثم</div>
+              <div class="miniMuted" id="prevLedgerMeta">—</div>
             </div>
-            <div class="sub">سوبر ماركت أولاد يحيى</div>
+            <div class="miniMuted" id="prevLedgerSummary">—</div>
           </div>
 
-          <div class="miniMuted">العمليات:</div>
-          <table class="miniTable">
+          <div class="miniMuted">تفاصيل العمليات:</div>
+          <table class="miniTable" style="margin-top:8px">
             <thead>
               <tr>
-                <th>التاريخ</th><th>النوع</th><th>الوصف</th>
-                <th class="num">الإجمالي</th><th class="num">المدفوع</th><th class="num">المتبقي</th>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الوصف</th>
+                <th class="num">الإجمالي</th>
+                <th class="num">المدفوع</th>
+                <th class="num">الباقي</th>
               </tr>
             </thead>
             <tbody id="prevLedgerEntriesTbody"></tbody>
           </table>
 
-          <div class="miniMuted" style="margin-top:12px;">المدفوعات:</div>
-          <table class="miniTable">
+          <div class="miniMuted" style="margin-top:12px">تفاصيل المدفوعات:</div>
+          <table class="miniTable" style="margin-top:8px">
             <thead>
-              <tr><th>التاريخ</th><th>ملاحظة</th><th class="num">المبلغ</th></tr>
+              <tr>
+                <th>التاريخ</th>
+                <th>ملاحظة</th>
+                <th class="num">المبلغ</th>
+              </tr>
             </thead>
             <tbody id="prevLedgerPaysTbody"></tbody>
           </table>
 
-          <div class="printFooter">
-            <div class="pfText">
-              <div><b>سوبر ماركت أولاد يحيى</b></div>
-              <div class="muted">إدارة هيثم • طباعة من النظام</div>
-            </div>
-            <img src="./qr.png" alt="QR" />
-          </div>
+          <div class="miniMuted">* للطباعة اختر Print → Save as PDF</div>
         </div>
-      </div>
-    </section>
-
-    <!-- ✅ Trash -->
-    <section id="page-trash" class="page" hidden>
-      <div class="pageHead">
-        <h2>سجل المحذوفات</h2>
-        <div class="filters">
-          <input id="trashQ" placeholder="بحث..." />
-        </div>
-      </div>
-
-      <div class="tableWrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>الوقت</th>
-              <th>النوع</th>
-              <th>الاسم</th>
-              <th class="num">المبلغ</th>
-              <th>ملاحظة</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody id="trashTbody"></tbody>
-        </table>
       </div>
     </section>
 
   </main>
 
-  <!-- ✅ Payment Modal -->
+  <!-- ✅ Footer (زي ما كان) -->
+  <footer class="footer2">
+    <div>© Axentro — All Rights Reserved 2024</div>
+    <div class="muted2">By Ahmed Hamouda</div>
+  </footer>
+
+  <!-- ✅ QR تحت الفوتر (هيظهر في الطباعة/PDF) -->
+  <div class="qrFooter">
+    <img src="images/qr.png" alt="QR Code" />
+  </div>
+
+  <!-- ✅ Modal: Add Payment -->
   <div id="payModal" class="modal" hidden>
     <div class="modalCard">
       <div class="modalHead">
         <h3>إضافة دفعة</h3>
-        <button id="payClose" class="btn small ghost" type="button">إغلاق</button>
+        <button id="payClose" class="btn small" type="button">إغلاق</button>
       </div>
 
       <div class="modalBody">
         <div class="field">
-          <label>التاريخ</label>
+          <label>تاريخ الدفع</label>
           <input id="payDate" type="date" />
+          <div class="help">التعليمات: اختار تاريخ الدفعة.</div>
         </div>
 
         <div class="field">
-          <label>المبلغ</label>
-          <input id="payAmount" type="number" step="0.01" placeholder="0.00" />
+          <label>المبلغ (جنيه)</label>
+          <input id="payAmount" type="number" min="0" step="0.01" placeholder="مثال: 200" />
+          <div class="help">التعليمات: اكتب قيمة الدفعة.</div>
         </div>
 
         <div class="field">
-          <label>ملاحظة</label>
-          <input id="payNote" placeholder="مثال: دفعة / تسوية..." />
+          <label>ملاحظة (اختياري)</label>
+          <input id="payNote" type="text" placeholder="مثال: تحويل فودافون كاش" />
+          <div class="help">التعليمات: أي توضيح لطريقة الدفع أو سبب الدفعة.</div>
         </div>
 
         <button id="paySave" class="btn primary" type="button">حفظ الدفعة</button>
-
-        <div id="payError" class="error" hidden>
-          من فضلك أدخل تاريخ صحيح + مبلغ أكبر من صفر.
-        </div>
+        <div id="payError" class="error" hidden>من فضلك املأ تاريخ الدفع والمبلغ.</div>
       </div>
     </div>
   </div>
 
-  <!-- ✅ Config: Apps Script Web App -->
-  <script>
-    window.AXENTRO_API = {
-      // ✅ ده لازم يكون لينك /exec (مش library/d)
-      scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
-      pin: "1234"
-    };
-  </script>
+  <!-- ✅ Modal: PIN Confirm (for delete) -->
+  <div id="pinConfirmModal" class="modal" hidden>
+    <div class="modalCard">
+      <div class="modalHead">
+        <h3>تأكيد الحذف</h3>
+        <button id="pinConfirmClose" class="btn small" type="button">إغلاق</button>
+      </div>
 
-  <script src="./app.js"></script>
+      <div class="modalBody">
+        <div class="field">
+          <label>أدخل PIN (1234) لإتمام الحذف</label>
+          <input id="pinConfirmInput" type="password" inputmode="numeric" placeholder="PIN" />
+          <div class="help">التعليمات: لن يتم الحذف إلا بعد إدخال PIN الصحيح.</div>
+        </div>
+
+        <button id="pinConfirmOk" class="btn danger" type="button">تأكيد الحذف</button>
+        <div id="pinConfirmError" class="error" hidden>PIN غير صحيح.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
