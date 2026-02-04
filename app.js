@@ -6,9 +6,12 @@
    ✅ كشف حساب + معاينات + طباعة/PDF
    ✅ تقارير Reports + اتجاه المدفوعات (out/in)
 
-   ✅ FIX (نهائي):
+   ✅ FIXES (نهائي):
    - حل CORS على اللاب: apiCall = GET فقط (بدون preflight)
    - تسريع: البحث/الفلاتر لا تعيد تحميل الشيت — فقط Render من الكاش
+   - ✅ حل الشلل بعد Refresh: Render على دفعات (Chunked) + تقليل smooth scroll
+   - ✅ Fix Bug: sort في showLedger كان غلط (a.date مقارنة بـ a.date)
+   - ✅ أزرار المعاينة (طباعة/رجوع) تم ربطها
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -137,6 +140,45 @@ function hideGlobalError(){
   if(banner) banner.hidden = true;
 }
 
+/* -------------------- ✅ Tiny helpers for smooth UI -------------------- */
+const NAV_STATE = { current: "dashboard", prev: "dashboard" };
+let __renderJobId = 0;
+
+function scrollTopFast(){
+  // ✅ avoid smooth scroll jank على الموبايل خصوصًا أثناء render/refresh
+  try{ window.scrollTo(0, 0); }catch(_e){}
+}
+
+function scheduleRender(){
+  const job = ++__renderJobId;
+  requestAnimationFrame(()=>{
+    if(job !== __renderJobId) return;
+    renderFromState();
+  });
+}
+
+async function renderChunked(container, items, renderItemFn, chunkSize = 80){
+  if(!container) return;
+  container.innerHTML = "";
+  const total = items.length;
+  let i = 0;
+
+  while(i < total){
+    const frag = document.createDocumentFragment();
+    const end = Math.min(i + chunkSize, total);
+
+    for(; i < end; i++){
+      const node = renderItemFn(items[i], i);
+      if(node) frag.appendChild(node);
+    }
+
+    container.appendChild(frag);
+
+    // ✅ yield للمتصفح علشان مايحصلش Freeze
+    await new Promise(r => requestAnimationFrame(r));
+  }
+}
+
 /* -------------------- Pages -------------------- */
 const PAGES = [
   "dashboard","records","payments","ledger",
@@ -146,6 +188,10 @@ const PAGES = [
 ];
 
 function showPage(name){
+  if(!PAGES.includes(name)) name = "dashboard";
+  NAV_STATE.prev = NAV_STATE.current;
+  NAV_STATE.current = name;
+
   PAGES.forEach(p=>{
     const node = document.getElementById("page-"+p);
     if(node) node.hidden = (p !== name);
@@ -155,7 +201,7 @@ function showPage(name){
     b.classList.toggle("active", b.dataset.page === name);
   });
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  scrollTopFast();
 
   if(name === "trash") renderTrash();
   if(name === "reports") renderReports();
@@ -209,7 +255,7 @@ function closeApp(){
   }
   if(el("pinError")) el("pinError").hidden = true;
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  scrollTopFast();
 }
 
 /* -------------------- PIN Gate -------------------- */
@@ -268,7 +314,6 @@ function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
     const err   = el("pinConfirmError");
 
     if(!modal || !inp || !ok || !close || !err){
-      // fallback بسيط لو حد حذف المودال بالغلط
       const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
       if(v === null) return resolve(false);
       return resolve((v || "").trim() === PIN_CODE);
@@ -661,6 +706,8 @@ const STATE = {
 function renderFromState(){
   const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   renderKPIs(entriesView, STATE.payments);
+
+  // ✅ Chunked tables علشان مايحصلش freeze
   renderEntriesTable(applyEntryFilters(entriesView));
   renderPaymentsTable(STATE.payments, STATE.entries);
 
@@ -726,59 +773,69 @@ function applyEntryFilters(entriesView){
   });
 }
 
-/* -------------------- Entries Table -------------------- */
-function renderEntriesTable(entriesView){
+/* -------------------- Entries Table (Chunked) -------------------- */
+let __entriesRenderToken = 0;
+async function renderEntriesTable(entriesView){
   const tbody = el("tbody");
   if(!tbody) return;
-  tbody.innerHTML = "";
+
+  const token = ++__entriesRenderToken;
 
   const sorted = [...entriesView].sort((a,b)=>
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
   );
 
-  for(const e of sorted){
-    const cat = e.type === "expense" ? (e.category || "—") : "—";
+  await renderChunked(
+    tbody,
+    sorted,
+    (e)=>{
+      if(token !== __entriesRenderToken) return null; // ✅ cancel old render
 
-    const payBtn = (e.type === "expense")
-      ? `<button class="btn small" type="button" disabled title="المصروف لا يحتاج دفعات">إضافة دفعة</button>`
-      : `<button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>`;
+      const cat = e.type === "expense" ? (e.category || "—") : "—";
 
-    const partyCell = `
-      <button class="btn small ghost" data-act="person" data-name="${escapeHtml(e.party || "")}" data-side="${e.side}">
-        ${escapeHtml(e.party || "")}
-      </button>
-    `;
+      const payBtn = (e.type === "expense")
+        ? `<button class="btn small" type="button" disabled title="المصروف لا يحتاج دفعات">إضافة دفعة</button>`
+        : `<button class="btn small" data-act="pay" data-id="${e.id}">إضافة دفعة</button>`;
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${e.date || "—"}</td>
-      <td><span class="badge">${typeLabel(e.type)}</span></td>
-      <td>${partyCell}</td>
-      <td>${escapeHtml(e.desc || "")}</td>
-      <td>${escapeHtml(cat)}</td>
-      <td class="num">${fmt(e.total)}</td>
-      <td class="num">${fmt(e.paid)}</td>
-      <td class="num">${fmt(e.remaining)}</td>
-      <td>
-        <div class="rowActions">
-          <button class="btn small" data-act="preview" data-id="${e.id}">معاينة</button>
-          ${payBtn}
-          <button class="btn small danger" data-act="del" data-id="${e.id}">حذف</button>
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  }
+      const partyCell = `
+        <button class="btn small ghost" data-act="person" data-name="${escapeHtml(e.party || "")}" data-side="${e.side}">
+          ${escapeHtml(e.party || "")}
+        </button>
+      `;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${e.date || "—"}</td>
+        <td><span class="badge">${typeLabel(e.type)}</span></td>
+        <td>${partyCell}</td>
+        <td>${escapeHtml(e.desc || "")}</td>
+        <td>${escapeHtml(cat)}</td>
+        <td class="num">${fmt(e.total)}</td>
+        <td class="num">${fmt(e.paid)}</td>
+        <td class="num">${fmt(e.remaining)}</td>
+        <td>
+          <div class="rowActions">
+            <button class="btn small" data-act="preview" data-id="${e.id}">معاينة</button>
+            ${payBtn}
+            <button class="btn small danger" data-act="del" data-id="${e.id}">حذف</button>
+          </div>
+        </td>
+      `;
+      return tr;
+    },
+    70
+  );
 }
 
-/* -------------------- Payments Table -------------------- */
-function renderPaymentsTable(payments, entries){
+/* -------------------- Payments Table (Chunked) -------------------- */
+let __paymentsRenderToken = 0;
+async function renderPaymentsTable(payments, entries){
   const tbody = el("payTbody");
   if(!tbody) return;
 
-  const q = (el("payQ")?.value || "").trim().toLowerCase();
-  tbody.innerHTML = "";
+  const token = ++__paymentsRenderToken;
 
+  const q = (el("payQ")?.value || "").trim().toLowerCase();
   const entryById = new Map(entries.map(e => [e.id, e]));
 
   const filtered = payments.filter(p=>{
@@ -794,21 +851,28 @@ function renderPaymentsTable(payments, entries){
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
   );
 
-  for(const p of sorted){
-    const en = entryById.get(p.entryId);
-    const ref = en ? `${typeLabel(en.type)} • ${en.date} • إجمالي ${fmt(en.total)}` : "—";
+  await renderChunked(
+    tbody,
+    sorted,
+    (p)=>{
+      if(token !== __paymentsRenderToken) return null; // ✅ cancel old render
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${p.date || "—"}</td>
-      <td>${escapeHtml(p.party || en?.party || "—")}</td>
-      <td>${escapeHtml(ref)} • <span class="badge">${flowLabel(p.flow || "out")}</span></td>
-      <td class="num">${fmt(p.amount)}</td>
-      <td>${escapeHtml(p.note || "—")}</td>
-      <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
-    `;
-    tbody.appendChild(tr);
-  }
+      const en = entryById.get(p.entryId);
+      const ref = en ? `${typeLabel(en.type)} • ${en.date} • إجمالي ${fmt(en.total)}` : "—";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.date || "—"}</td>
+        <td>${escapeHtml(p.party || en?.party || "—")}</td>
+        <td>${escapeHtml(ref)} • <span class="badge">${flowLabel(p.flow || "out")}</span></td>
+        <td class="num">${fmt(p.amount)}</td>
+        <td>${escapeHtml(p.note || "—")}</td>
+        <td><button class="btn small danger" data-paydel="${p.id}">حذف</button></td>
+      `;
+      return tr;
+    },
+    80
+  );
 }
 
 /* -------------------- Payments Modal -------------------- */
@@ -955,7 +1019,8 @@ function showLedger(name){
   const entries = entriesAll
     .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
+    // ✅ FIX: كان a.date مقارنة بـ a.date (غلط)
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
@@ -1356,14 +1421,16 @@ async function refresh(forceNetwork = false){
   try{
     hideGlobalError();
 
+    // ✅ عرض سريع من المحلي الأول (لو مش force)
     if(!forceNetwork){
       const local = await STORE.local.getAll();
       STATE.entries = Array.isArray(local.entries) ? local.entries : [];
       STATE.payments = Array.isArray(local.payments) ? local.payments : [];
       STATE.trash = Array.isArray(local.trash) ? local.trash : [];
-      renderFromState();
+      scheduleRender();
     }
 
+    // ✅ بعدها نجيب من الشيت
     const all = await STORE.getAll();
 
     const payments = (all.payments || []).map(p => ({
@@ -1375,7 +1442,7 @@ async function refresh(forceNetwork = false){
     STATE.payments = payments;
     STATE.trash = Array.isArray(all.trash) ? all.trash : [];
 
-    renderFromState();
+    scheduleRender();
     hideGlobalError();
 
   }catch(e){
@@ -1395,6 +1462,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   try{
     ensureGlobalBanner();
     setupPinGate();
+
+    // ✅ ربط أزرار المعاينات (لو موجودين)
+    el("btnPrintEntry")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
+    el("btnBackFromEntryPreview")?.addEventListener("click", ()=> showPage("records"));
+    el("btnPrintLedger")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
+    el("btnBackFromLedgerPreview")?.addEventListener("click", ()=> showPage("ledger"));
 
     if(isAuthed()){
       document.documentElement.classList.add("authed");
@@ -1464,7 +1537,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }catch(e){
         console.error(e);
         showGlobalError("تعذر حفظ العملية على الشيت. تم الحفظ محليًا إذا كان الوضع Offline.");
-        renderFromState();
+        scheduleRender();
       }
     });
 
@@ -1472,11 +1545,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // ✅✅✅ سرعة: الفلاتر تعمل render فقط
     ["q","filterType","filterOpen"].forEach(id=>{
-      el(id)?.addEventListener("input", renderFromState);
-      el(id)?.addEventListener("change", renderFromState);
+      el(id)?.addEventListener("input", scheduleRender);
+      el(id)?.addEventListener("change", scheduleRender);
     });
-    el("payQ")?.addEventListener("input", renderFromState);
-    el("trashQ")?.addEventListener("input", renderFromState);
+    el("payQ")?.addEventListener("input", scheduleRender);
+    el("trashQ")?.addEventListener("input", scheduleRender);
 
     // Reports
     el("btnRunReports")?.addEventListener("click", renderReports);
