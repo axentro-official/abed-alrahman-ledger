@@ -15,8 +15,6 @@ const LS_KEY   = "oy_ledger_v3";
 const PIN_CODE = "1234";
 const AUTH_KEY = "oy_auth_v1";
 
-// ✅ API Config (Google Apps Script Web App)
-// لو مش عايز تكتبها في index.html، سيبها هنا.
 window.AXENTRO_API = window.AXENTRO_API || {
   scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
   pin: "1234"
@@ -260,15 +258,70 @@ function setupPinGate(){
   }
 }
 
-/* -------------------- Helpers: PIN confirm -------------------- */
-function requirePin(actionText = "تنفيذ العملية"){
-  const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
-  if(v === null) return false;
-  if((v || "").trim() !== PIN_CODE){
-    alert("PIN غير صحيح.");
-    return false;
-  }
-  return true;
+/* -------------------- ✅ PIN Confirm Modal (بديل prompt/alert) -------------------- */
+function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
+  return new Promise((resolve)=>{
+    const modal = el("pinConfirmModal");
+    const inp   = el("pinConfirmInput");
+    const ok    = el("pinConfirmOk");
+    const close = el("pinConfirmClose");
+    const err   = el("pinConfirmError");
+
+    if(!modal || !inp || !ok || !close || !err){
+      // fallback بسيط لو حد حذف المودال بالغلط
+      const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
+      if(v === null) return resolve(false);
+      return resolve((v || "").trim() === PIN_CODE);
+    }
+
+    err.hidden = true;
+    inp.value = "";
+    modal.hidden = false;
+
+    const cleanup = ()=>{
+      ok.removeEventListener("click", onOk);
+      close.removeEventListener("click", onClose);
+      modal.removeEventListener("click", onBackdrop);
+      inp.removeEventListener("keydown", onKey);
+      modal.hidden = true;
+    };
+
+    const onClose = ()=>{
+      cleanup();
+      resolve(false);
+    };
+
+    const onBackdrop = (ev)=>{
+      if(ev.target === modal){
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    const onOk = ()=>{
+      const v = (inp.value || "").trim();
+      if(v !== PIN_CODE){
+        err.hidden = false;
+        inp.focus();
+        inp.select();
+        return;
+      }
+      cleanup();
+      resolve(true);
+    };
+
+    const onKey = (ev)=>{
+      if(ev.key === "Enter"){ ev.preventDefault(); onOk(); }
+      if(ev.key === "Escape"){ ev.preventDefault(); onClose(); }
+    };
+
+    ok.addEventListener("click", onOk);
+    close.addEventListener("click", onClose);
+    modal.addEventListener("click", onBackdrop);
+    inp.addEventListener("keydown", onKey);
+
+    setTimeout(()=>{ inp.focus(); }, 50);
+  });
 }
 
 /* -------------------- Forms -------------------- */
@@ -899,11 +952,10 @@ function showLedger(name){
   const entriesAll = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   const paysAll = STATE.payments;
 
-  // ✅ المطلوب: لو الاسم فاضي — اعرض كل العمليات حسب الوضع (عملاء/موردين/الكل)
   const entries = entriesAll
     .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
@@ -997,7 +1049,6 @@ function openLedgerPreview(){
   const q = (el("ledgerName")?.value || "").trim();
   const mode = getLedgerMode();
 
-  // ✅ لو الاسم فاضي — اعرض معاينة “الكل” حسب الوضع
   const entriesAll = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   const paysAll = STATE.payments;
 
@@ -1305,7 +1356,6 @@ async function refresh(forceNetwork = false){
   try{
     hideGlobalError();
 
-    // ✅ عرض فوري من الكاش المحلي (لو موجود)
     if(!forceNetwork){
       const local = await STORE.local.getAll();
       STATE.entries = Array.isArray(local.entries) ? local.entries : [];
@@ -1314,7 +1364,6 @@ async function refresh(forceNetwork = false){
       renderFromState();
     }
 
-    // ✅ بعدها نجيب من الشيت
     const all = await STORE.getAll();
 
     const payments = (all.payments || []).map(p => ({
@@ -1421,7 +1470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     el("btnReset")?.addEventListener("click", resetForm);
 
-    // ✅✅✅ سرعة: الفلاتر تعمل render فقط (لا تعمل refresh للشيت)
+    // ✅✅✅ سرعة: الفلاتر تعمل render فقط
     ["q","filterType","filterOpen"].forEach(id=>{
       el(id)?.addEventListener("input", renderFromState);
       el(id)?.addEventListener("change", renderFromState);
@@ -1450,7 +1499,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const id = btn.dataset.id;
 
       if(act === "del"){
-        if(!requirePin("الحذف")) return;
+        const okPin = await pinConfirmModalOpen("الحذف");
+        if(!okPin) return;
+
         if(confirm("متأكد حذف العملية؟ (سيتم حذف المدفوعات التابعة لها أيضًا)")){
           const entry = STATE.entries.find(e => e.id === id) || null;
           const pays = STATE.payments.filter(p => p.entryId === id);
@@ -1547,7 +1598,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const payId = btn.dataset.paydel;
       if(!payId) return;
 
-      if(!requirePin("حذف الدفعة")) return;
+      const okPin = await pinConfirmModalOpen("حذف الدفعة");
+      if(!okPin) return;
+
       if(confirm("متأكد حذف الدفعة؟")){
         const pay = STATE.payments.find(p => p.id === payId) || null;
 
@@ -1568,7 +1621,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const logId = btn.dataset.trashdel;
       if(!logId) return;
 
-      if(!requirePin("الحذف النهائي من سجل المحذوفات")) return;
+      const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
+      if(!okPin) return;
+
       if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
         try{
           await STORE.deleteTrashLog(logId);
