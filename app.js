@@ -6,12 +6,9 @@
    ✅ كشف حساب + معاينات + طباعة/PDF
    ✅ تقارير Reports + اتجاه المدفوعات (out/in)
 
-   ✅ FIXES (نهائي):
+   ✅ FIX (نهائي):
    - حل CORS على اللاب: apiCall = GET فقط (بدون preflight)
    - تسريع: البحث/الفلاتر لا تعيد تحميل الشيت — فقط Render من الكاش
-   - ✅ حل الشلل بعد Refresh: Render على دفعات (Chunked) + تقليل smooth scroll
-   - ✅ Fix Bug: sort في showLedger كان غلط (a.date مقارنة بـ a.date)
-   - ✅ أزرار المعاينة (طباعة/رجوع) تم ربطها
 */
 
 const LS_KEY   = "oy_ledger_v3";
@@ -140,45 +137,6 @@ function hideGlobalError(){
   if(banner) banner.hidden = true;
 }
 
-/* -------------------- ✅ Tiny helpers for smooth UI -------------------- */
-const NAV_STATE = { current: "dashboard", prev: "dashboard" };
-let __renderJobId = 0;
-
-function scrollTopFast(){
-  // ✅ avoid smooth scroll jank على الموبايل خصوصًا أثناء render/refresh
-  try{ window.scrollTo(0, 0); }catch(_e){}
-}
-
-function scheduleRender(){
-  const job = ++__renderJobId;
-  requestAnimationFrame(()=>{
-    if(job !== __renderJobId) return;
-    renderFromState();
-  });
-}
-
-async function renderChunked(container, items, renderItemFn, chunkSize = 80){
-  if(!container) return;
-  container.innerHTML = "";
-  const total = items.length;
-  let i = 0;
-
-  while(i < total){
-    const frag = document.createDocumentFragment();
-    const end = Math.min(i + chunkSize, total);
-
-    for(; i < end; i++){
-      const node = renderItemFn(items[i], i);
-      if(node) frag.appendChild(node);
-    }
-
-    container.appendChild(frag);
-
-    // ✅ yield للمتصفح علشان مايحصلش Freeze
-    await new Promise(r => requestAnimationFrame(r));
-  }
-}
-
 /* -------------------- Pages -------------------- */
 const PAGES = [
   "dashboard","records","payments","ledger",
@@ -188,10 +146,6 @@ const PAGES = [
 ];
 
 function showPage(name){
-  if(!PAGES.includes(name)) name = "dashboard";
-  NAV_STATE.prev = NAV_STATE.current;
-  NAV_STATE.current = name;
-
   PAGES.forEach(p=>{
     const node = document.getElementById("page-"+p);
     if(node) node.hidden = (p !== name);
@@ -201,7 +155,7 @@ function showPage(name){
     b.classList.toggle("active", b.dataset.page === name);
   });
 
-  scrollTopFast();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 
   if(name === "trash") renderTrash();
   if(name === "reports") renderReports();
@@ -255,7 +209,7 @@ function closeApp(){
   }
   if(el("pinError")) el("pinError").hidden = true;
 
-  scrollTopFast();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* -------------------- PIN Gate -------------------- */
@@ -314,6 +268,7 @@ function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
     const err   = el("pinConfirmError");
 
     if(!modal || !inp || !ok || !close || !err){
+      // fallback بسيط لو حد حذف المودال بالغلط
       const v = prompt(`تأكيد ${actionText}\nاكتب PIN:`);
       if(v === null) return resolve(false);
       return resolve((v || "").trim() === PIN_CODE);
@@ -702,14 +657,63 @@ const STATE = {
   trash: []
 };
 
+/* -------------------------------------------------------
+   ✅ Chunked rendering helpers (لتجنب freeze)
+------------------------------------------------------- */
+function raf(){
+  return new Promise(r=>requestAnimationFrame(()=>r()));
+}
+
+async function renderChunked(tbody, items, renderRow, opts = {}){
+  const chunkSize = Number(opts.chunkSize || 180);
+  const tokenKey = opts.tokenKey || null;
+  const tokenVal = opts.tokenVal || null;
+
+  tbody.innerHTML = "";
+  const frag = document.createDocumentFragment();
+
+  for(let i=0;i<items.length;i++){
+    // إلغاء رندر قديم لو بدأ رندر أحدث
+    if(tokenKey && tokenVal != null && window[tokenKey] !== tokenVal) return;
+
+    const tr = renderRow(items[i], i);
+    frag.appendChild(tr);
+
+    if((i+1) % chunkSize === 0){
+      tbody.appendChild(frag);
+      await raf();
+    }
+  }
+  tbody.appendChild(frag);
+}
+
+/* -------------------- Render Queue (حل التجميد بعد Refresh) -------------------- */
+let __renderPending = false;
+let __renderToken = 0;
+
+function requestRender(){
+  if(__renderPending) return;
+  __renderPending = true;
+  const token = ++__renderToken;
+
+  Promise.resolve().then(async ()=>{
+    await raf();                 // سيب فرصة للـ UI
+    __renderPending = false;
+    if(token !== __renderToken) return; // لو اتطلب رندر أحدث تجاهل القديم
+    await renderFromState();
+  });
+}
+
+// أبقيت الاسم ده عشان لو في أماكن قديمة بتناديه
+function scheduleRender(){ requestRender(); }
+
 /* -------------------- Render (من الكاش فقط) ✅ سرعة -------------------- */
-function renderFromState(){
+async function renderFromState(){
   const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   renderKPIs(entriesView, STATE.payments);
 
-  // ✅ Chunked tables علشان مايحصلش freeze
-  renderEntriesTable(applyEntryFilters(entriesView));
-  renderPaymentsTable(STATE.payments, STATE.entries);
+  await renderEntriesTable(applyEntryFilters(entriesView));
+  await renderPaymentsTable(STATE.payments, STATE.entries);
 
   const trashPage = document.getElementById("page-trash");
   if(trashPage && !trashPage.hidden) renderTrash();
@@ -773,13 +777,14 @@ function applyEntryFilters(entriesView){
   });
 }
 
-/* -------------------- Entries Table (Chunked) -------------------- */
+/* -------------------- Entries Table -------------------- */
 let __entriesRenderToken = 0;
+
 async function renderEntriesTable(entriesView){
   const tbody = el("tbody");
   if(!tbody) return;
 
-  const token = ++__entriesRenderToken;
+  const myToken = ++__entriesRenderToken;
 
   const sorted = [...entriesView].sort((a,b)=>
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
@@ -789,8 +794,6 @@ async function renderEntriesTable(entriesView){
     tbody,
     sorted,
     (e)=>{
-      if(token !== __entriesRenderToken) return null; // ✅ cancel old render
-
       const cat = e.type === "expense" ? (e.category || "—") : "—";
 
       const payBtn = (e.type === "expense")
@@ -823,19 +826,21 @@ async function renderEntriesTable(entriesView){
       `;
       return tr;
     },
-    70
+    { chunkSize: 160, tokenKey: "__entriesRenderToken", tokenVal: myToken }
   );
 }
 
-/* -------------------- Payments Table (Chunked) -------------------- */
+/* -------------------- Payments Table -------------------- */
 let __paymentsRenderToken = 0;
+
 async function renderPaymentsTable(payments, entries){
   const tbody = el("payTbody");
   if(!tbody) return;
 
-  const token = ++__paymentsRenderToken;
+  const myToken = ++__paymentsRenderToken;
 
   const q = (el("payQ")?.value || "").trim().toLowerCase();
+
   const entryById = new Map(entries.map(e => [e.id, e]));
 
   const filtered = payments.filter(p=>{
@@ -855,8 +860,6 @@ async function renderPaymentsTable(payments, entries){
     tbody,
     sorted,
     (p)=>{
-      if(token !== __paymentsRenderToken) return null; // ✅ cancel old render
-
       const en = entryById.get(p.entryId);
       const ref = en ? `${typeLabel(en.type)} • ${en.date} • إجمالي ${fmt(en.total)}` : "—";
 
@@ -871,7 +874,7 @@ async function renderPaymentsTable(payments, entries){
       `;
       return tr;
     },
-    80
+    { chunkSize: 180, tokenKey: "__paymentsRenderToken", tokenVal: myToken }
   );
 }
 
@@ -1019,8 +1022,7 @@ function showLedger(name){
   const entries = entriesAll
     .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    // ✅ FIX: كان a.date مقارنة بـ a.date (غلط)
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
@@ -1120,13 +1122,13 @@ function openLedgerPreview(){
   const entries = entriesAll
     .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - a.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
   const pays = paysAll
     .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(p => allowedEntryIds.has(p.entryId))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
+    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - b.createdAt));
 
   const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
   const paid  = entries.reduce((a,e)=> a + (Number.isFinite(e.paid) ? e.paid : 0), 0);
@@ -1392,7 +1394,7 @@ function renderReports(){
   if(repPaysTbody){
     repPaysTbody.innerHTML = "";
     const sortedPays = [...pays].sort((a,b)=>
-      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
+      (b.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt)
     );
 
     if(sortedPays.length === 0){
@@ -1421,16 +1423,14 @@ async function refresh(forceNetwork = false){
   try{
     hideGlobalError();
 
-    // ✅ عرض سريع من المحلي الأول (لو مش force)
     if(!forceNetwork){
       const local = await STORE.local.getAll();
       STATE.entries = Array.isArray(local.entries) ? local.entries : [];
       STATE.payments = Array.isArray(local.payments) ? local.payments : [];
       STATE.trash = Array.isArray(local.trash) ? local.trash : [];
-      scheduleRender();
+      await renderFromState();
     }
 
-    // ✅ بعدها نجيب من الشيت
     const all = await STORE.getAll();
 
     const payments = (all.payments || []).map(p => ({
@@ -1442,7 +1442,7 @@ async function refresh(forceNetwork = false){
     STATE.payments = payments;
     STATE.trash = Array.isArray(all.trash) ? all.trash : [];
 
-    scheduleRender();
+    await renderFromState();
     hideGlobalError();
 
   }catch(e){
@@ -1462,12 +1462,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   try{
     ensureGlobalBanner();
     setupPinGate();
-
-    // ✅ ربط أزرار المعاينات (لو موجودين)
-    el("btnPrintEntry")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
-    el("btnBackFromEntryPreview")?.addEventListener("click", ()=> showPage("records"));
-    el("btnPrintLedger")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
-    el("btnBackFromLedgerPreview")?.addEventListener("click", ()=> showPage("ledger"));
 
     if(isAuthed()){
       document.documentElement.classList.add("authed");
@@ -1537,13 +1531,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       }catch(e){
         console.error(e);
         showGlobalError("تعذر حفظ العملية على الشيت. تم الحفظ محليًا إذا كان الوضع Offline.");
-        scheduleRender();
+        requestRender();
       }
     });
 
     el("btnReset")?.addEventListener("click", resetForm);
 
-    // ✅✅✅ سرعة: الفلاتر تعمل render فقط
+    // ✅✅✅ سرعة: الفلاتر تعمل render فقط (مجدول)
     ["q","filterType","filterOpen"].forEach(id=>{
       el(id)?.addEventListener("input", scheduleRender);
       el(id)?.addEventListener("change", scheduleRender);
