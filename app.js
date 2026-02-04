@@ -1,4 +1,5 @@
-/* سوبر ماركت أولاد يحيى — دفتر الحسابات
+/***************************************
+ * سوبر ماركت أولاد يحيى — دفتر الحسابات
    ✅ PIN ثابت: 1234
    ✅ مدفوعات منفصلة payments[] مرتبطة بكل عملية entryId
    ✅ Refresh لا يعمل Logout (sessionStorage)
@@ -9,7 +10,10 @@
    ✅ FIX (نهائي):
    - حل CORS على اللاب: apiCall = GET فقط (بدون preflight)
    - تسريع: البحث/الفلاتر لا تعيد تحميل الشيت — فقط Render من الكاش
-*/
+
+   ✅ طلبك:
+   - كشف الحساب: لو الاسم فاضي + اختر (عملاء/موردين) => يعرض "الكل" حسب الفلتر
+ ****************************************/
 
 const LS_KEY   = "oy_ledger_v3";
 const PIN_CODE = "1234";
@@ -377,8 +381,8 @@ class LocalStore {
     try{
       const raw = localStorage.getItem(LS_KEY);
       const data = raw ? JSON.parse(raw) : { entries: [], payments: [] };
-      if (!Array.isArray(data.entries)) data.entries = [];
-      if (!Array.isArray(data.payments)) data.payments = [];
+      if(!Array.isArray(data.entries)) data.entries = [];
+      if(!Array.isArray(data.payments)) data.payments = [];
 
       data.payments = data.payments.map(p => ({
         ...p,
@@ -387,7 +391,7 @@ class LocalStore {
 
       const rawT = localStorage.getItem(TRASH_KEY);
       const t = rawT ? JSON.parse(rawT) : { logs: [] };
-      if (!Array.isArray(t.logs)) t.logs = [];
+      if(!Array.isArray(t.logs)) t.logs = [];
 
       return { entries: data.entries, payments: data.payments, trash: t.logs };
     }catch{
@@ -886,23 +890,24 @@ function showLedger(name){
   if(!box) return;
 
   box.innerHTML = "";
-  const q = (name || "").trim().toLowerCase();
+
   const mode = getLedgerMode();
+  const q = (name || "").trim().toLowerCase();
 
   const entriesAll = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   const paysAll = STATE.payments;
 
-  // ✅ NEW: لو الاسم فاضي → اعرض كل العمليات حسب الوضع (الكل/عملاء/موردين)
+  // ✅ لو الاسم فاضي: اعرض "الكل" حسب وضع (كل/عملاء/موردين)
   const entries = entriesAll
-    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
+    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
   const pays = paysAll
-    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q))
     .filter(p => allowedEntryIds.has(p.entryId))
+    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
   if(entries.length === 0 && pays.length === 0){
@@ -919,18 +924,20 @@ function showLedger(name){
     mode === "supplier" ? " (موردين فقط)" :
     "";
 
+  const titleLine = q ? `تفاصيل: ${escapeHtml(name)}${headerMode}` : `عرض الكل${headerMode}`;
+
   const paidLabel = (mode === "customer") ? "المدفوع (داخلة)" :
                     (mode === "supplier") ? "المدفوع (خارجة)" :
                     "المدفوع";
 
-  const who = q ? ` (${escapeHtml(name)})` : " (الكل)";
   box.innerHTML += `
-    <div class="line"><b>الإجمالي${headerMode}${who}</b><b>${fmt(total)}</b></div>
+    <div class="muted" style="margin-bottom:8px">${titleLine}</div>
+    <div class="line"><b>الإجمالي</b><b>${fmt(total)}</b></div>
     <div class="line"><span>${paidLabel}</span><b>${fmt(paid)}</b></div>
     <div class="line"><span>المتبقي</span><b>${fmt(rem)}</b></div>
   `;
 
-  box.innerHTML += `<div class="muted" style="margin:10px 0">تفاصيل العمليات (مطابقة):</div>`;
+  box.innerHTML += `<div class="muted" style="margin:10px 0">تفاصيل العمليات:</div>`;
   for(const e of entries){
     box.innerHTML += `
       <div class="line">
@@ -950,7 +957,7 @@ function showLedger(name){
   }
 
   if(pays.length){
-    box.innerHTML += `<div class="muted" style="margin:10px 0">تفاصيل المدفوعات (مطابقة):</div>`;
+    box.innerHTML += `<div class="muted" style="margin:10px 0">تفاصيل المدفوعات:</div>`;
     for(const p of pays){
       box.innerHTML += `
         <div class="line">
@@ -969,20 +976,17 @@ function showLedger(name){
 
 function openPersonDetails(name, side = "all"){
   const clean = (name || "").trim();
-  if(!clean) return;
-
   showPage("ledger");
-  if(el("ledgerName")){
-    el("ledgerName").value = clean;
 
-    if(el("ledgerMode")){
-      if(side === "payable") el("ledgerMode").value = "supplier";
-      else if(side === "receivable") el("ledgerMode").value = "customer";
-      else el("ledgerMode").value = "all";
-    }
+  if(el("ledgerName")) el("ledgerName").value = clean;
 
-    showLedger(clean);
+  if(el("ledgerMode")){
+    if(side === "payable") el("ledgerMode").value = "supplier";
+    else if(side === "receivable") el("ledgerMode").value = "customer";
+    else el("ledgerMode").value = "all";
   }
+
+  showLedger(clean);
 }
 
 /* -------------------- Ledger Preview -------------------- */
@@ -994,14 +998,14 @@ function openLedgerPreview(){
   const paysAll = STATE.payments;
 
   const entries = entriesAll
-    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(e => entryMatchesLedgerMode(e, mode))
-    .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
+    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q.toLowerCase()))
+    .sort((a,b)=> (a.date || "").localeCompare(a.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
   const pays = paysAll
-    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(p => allowedEntryIds.has(p.entryId))
+    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
   const total = entries.reduce((a,e)=> a + (Number.isFinite(e.total) ? e.total : 0), 0);
@@ -1013,8 +1017,10 @@ function openLedgerPreview(){
     mode === "supplier" ? "موردين فقط" :
     "الكل";
 
+  const metaTitle = q ? `الاسم: ${q} • الوضع: ${headerMode}` : `عرض الكل • الوضع: ${headerMode}`;
+
   el("prevLedgerMeta") && (el("prevLedgerMeta").textContent =
-    `الاسم: ${q ? q : "الكل"} • الوضع: ${headerMode} • ${new Date().toLocaleString("ar-EG")}`
+    `${metaTitle} • ${new Date().toLocaleString("ar-EG")}`
   );
 
   const paidLabel = (mode === "customer") ? "المدفوع (داخلة)" :
@@ -1267,7 +1273,7 @@ function renderReports(){
   if(repPaysTbody){
     repPaysTbody.innerHTML = "";
     const sortedPays = [...pays].sort((a,b)=>
-      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - b.createdAt)
     );
 
     if(sortedPays.length === 0){
@@ -1296,7 +1302,7 @@ async function refresh(forceNetwork = false){
   try{
     hideGlobalError();
 
-    // ✅ عرض فوري من الكاش المحلي (لو موجود) — بيريح المستخدم
+    // ✅ عرض فوري من الكاش المحلي (لو موجود)
     if(!forceNetwork){
       const local = await STORE.local.getAll();
       STATE.entries = Array.isArray(local.entries) ? local.entries : [];
@@ -1305,7 +1311,7 @@ async function refresh(forceNetwork = false){
       renderFromState();
     }
 
-    // ✅ بعدها نجيب من الشيت (مرة واحدة)
+    // ✅ بعدها نجيب من الشيت
     const all = await STORE.getAll();
 
     const payments = (all.payments || []).map(p => ({
@@ -1503,6 +1509,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const side = moneySide(entry.type);
       const affectingFlow = (side === "receivable") ? "in" : "out";
 
+      // ✅ منع تجاوز الإجمالي للدفعات المؤثرة فقط
       if(flow === affectingFlow && Number.isFinite(entry.total)){
         const alreadyAffecting = sumPaymentsForEntry(entry.id, STATE.payments, affectingFlow);
         if((alreadyAffecting + amount) > Number(entry.total) + 1e-9){
