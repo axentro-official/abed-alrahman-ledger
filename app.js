@@ -377,8 +377,8 @@ class LocalStore {
     try{
       const raw = localStorage.getItem(LS_KEY);
       const data = raw ? JSON.parse(raw) : { entries: [], payments: [] };
-      if(!Array.isArray(data.entries)) data.entries = [];
-      if(!Array.isArray(data.payments)) data.payments = [];
+      if (!Array.isArray(data.entries)) data.entries = [];
+      if (!Array.isArray(data.payments)) data.payments = [];
 
       data.payments = data.payments.map(p => ({
         ...p,
@@ -387,7 +387,7 @@ class LocalStore {
 
       const rawT = localStorage.getItem(TRASH_KEY);
       const t = rawT ? JSON.parse(rawT) : { logs: [] };
-      if(!Array.isArray(t.logs)) t.logs = [];
+      if (!Array.isArray(t.logs)) t.logs = [];
 
       return { entries: data.entries, payments: data.payments, trash: t.logs };
     }catch{
@@ -887,25 +887,21 @@ function showLedger(name){
 
   box.innerHTML = "";
   const q = (name || "").trim().toLowerCase();
-  if(!q){
-    box.innerHTML = `<div class="muted">اكتب الاسم… (مثال: اكتب "احم" وسيظهر كل من يحتوي عليها)</div>`;
-    return;
-  }
-
   const mode = getLedgerMode();
 
   const entriesAll = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   const paysAll = STATE.payments;
 
+  // ✅ NEW: لو الاسم فاضي → اعرض كل العمليات حسب الوضع (الكل/عملاء/موردين)
   const entries = entriesAll
-    .filter(e => (e.party || "").trim().toLowerCase().includes(q))
+    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q))
     .filter(e => entryMatchesLedgerMode(e, mode))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
 
   const pays = paysAll
-    .filter(p => (p.party || "").trim().toLowerCase().includes(q))
+    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q))
     .filter(p => allowedEntryIds.has(p.entryId))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
@@ -927,8 +923,9 @@ function showLedger(name){
                     (mode === "supplier") ? "المدفوع (خارجة)" :
                     "المدفوع";
 
+  const who = q ? ` (${escapeHtml(name)})` : " (الكل)";
   box.innerHTML += `
-    <div class="line"><b>الإجمالي${headerMode}</b><b>${fmt(total)}</b></div>
+    <div class="line"><b>الإجمالي${headerMode}${who}</b><b>${fmt(total)}</b></div>
     <div class="line"><span>${paidLabel}</span><b>${fmt(paid)}</b></div>
     <div class="line"><span>المتبقي</span><b>${fmt(rem)}</b></div>
   `;
@@ -991,24 +988,19 @@ function openPersonDetails(name, side = "all"){
 /* -------------------- Ledger Preview -------------------- */
 function openLedgerPreview(){
   const q = (el("ledgerName")?.value || "").trim();
-  if(!q){
-    alert("اكتب الاسم أولاً ثم اضغط معاينة.");
-    return;
-  }
-
   const mode = getLedgerMode();
 
   const entriesAll = STATE.entries.map(e => computeEntryView(e, STATE.payments));
   const paysAll = STATE.payments;
 
   const entries = entriesAll
-    .filter(e => (e.party || "").trim().toLowerCase().includes(q.toLowerCase()))
+    .filter(e => !q ? true : (e.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(e => entryMatchesLedgerMode(e, mode))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (a.createdAt - b.createdAt));
 
   const allowedEntryIds = new Set(entries.map(e => e.id));
   const pays = paysAll
-    .filter(p => (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
+    .filter(p => !q ? true : (p.party || "").trim().toLowerCase().includes(q.toLowerCase()))
     .filter(p => allowedEntryIds.has(p.entryId))
     .sort((a,b)=> (a.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt));
 
@@ -1022,7 +1014,7 @@ function openLedgerPreview(){
     "الكل";
 
   el("prevLedgerMeta") && (el("prevLedgerMeta").textContent =
-    `الاسم: ${q} • الوضع: ${headerMode} • ${new Date().toLocaleString("ar-EG")}`
+    `الاسم: ${q ? q : "الكل"} • الوضع: ${headerMode} • ${new Date().toLocaleString("ar-EG")}`
   );
 
   const paidLabel = (mode === "customer") ? "المدفوع (داخلة)" :
@@ -1136,7 +1128,7 @@ function renderTrash(){
   }
 }
 
-/* -------------------- Reports (كما هو عندك) -------------------- */
+/* -------------------- Reports -------------------- */
 function toDateNum(iso){
   if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
   return Number(iso.replaceAll("-", ""));
@@ -1275,7 +1267,7 @@ function renderReports(){
   if(repPaysTbody){
     repPaysTbody.innerHTML = "";
     const sortedPays = [...pays].sort((a,b)=>
-      (b.date || "").localeCompare(a.date || "") || (b.createdAt - b.createdAt)
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
     );
 
     if(sortedPays.length === 0){
