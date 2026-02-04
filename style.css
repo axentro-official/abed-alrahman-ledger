@@ -399,7 +399,7 @@ input::placeholder{color: rgba(169,183,208,.7)}
   font-weight:700;
 }
 
-/* ✅ NEW: QR تحت الفوتر (عادي + طباعة) */
+/* ✅ QR تحت الفوتر (عادي + طباعة) */
 .qrFooter{
   text-align:center;
   padding: 14px 14px 28px;
@@ -419,55 +419,15 @@ input::placeholder{color: rgba(169,183,208,.7)}
 [hidden]{ display:none !important; }
 .gate[hidden], .modal[hidden]{ display:none !important; }
 
-/* =========================================================
-   ✅ FIX 1: منع وميض PIN Gate بعد Refresh (اعتمادًا على html.authed)
-   ========================================================= */
-html.authed #pinGate{
-  display:none !important;
-}
-
-/* =========================================================
-   ✅ FIX 2: Print Footer ثابت (نص + QR) — يظهر في PDF دائمًا
-   ========================================================= */
-.printFooter{
-  display:none; /* يظهر فقط عند الطباعة/PDF */
-  margin-top:14px;
-  padding-top:10px;
-  border-top:1px solid rgba(255,255,255,.12);
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-}
-.printFooter .pfMeta{
-  font-size:12px;
-  opacity:.88;
-  line-height:1.4;
-}
-.printFooter .pfMeta.muted{
-  opacity:.75;
-  font-weight:700;
-}
-.printFooter img{
-  width:110px;
-  max-width:40vw;
-  height:auto;
-  display:inline-block;
-  border-radius:14px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.04);
-  padding: 10px;
-}
+/* ✅ FIX: منع وميض PIN Gate بعد Refresh (اعتمادًا على html.authed) */
+html.authed #pinGate{ display:none !important; }
 
 /* =========================================================
    ✅ Preview / Print Styles
    ========================================================= */
 
 /* صفحات المعاينة */
-.previewWrap{
-  display:grid;
-  gap:12px;
-}
+.previewWrap{ display:grid; gap:12px; }
 .previewHead{
   display:flex;
   align-items:center;
@@ -475,15 +435,8 @@ html.authed #pinGate{
   gap:10px;
   flex-wrap:wrap;
 }
-.previewHead h2{
-  margin:0;
-  font-size:16px;
-}
-.previewActions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
+.previewHead h2{ margin:0; font-size:16px; }
+.previewActions{ display:flex; gap:8px; flex-wrap:wrap; }
 
 /* كارت المعاينة */
 .printCard{
@@ -503,15 +456,9 @@ html.authed #pinGate{
   padding-bottom:10px;
   margin-bottom:10px;
 }
-.printHeader .title{
-  font-weight:900;
-  font-size:16px;
-}
-.printHeader .sub{
-  color:var(--muted);
-  font-size:12px;
-  margin-top:4px;
-}
+.printHeader .title{ font-weight:900; font-size:16px; }
+.printHeader .sub{ color:var(--muted); font-size:12px; margin-top:4px; }
+
 .kvGrid{
   display:grid;
   grid-template-columns: repeat(2, minmax(0,1fr));
@@ -550,23 +497,17 @@ html.authed #pinGate{
 
 /* =========================================================
    ✅ PRINT MODE (Save as PDF) — محسّن A4
+   ✅ المطلوب: الفوتر + QR يظهروا في الطباعة
    ========================================================= */
 @media print{
-  /* ✅ A4 + margins */
-  @page{
-    size: A4;
-    margin: 12mm;
-  }
+  @page{ size: A4; margin: 12mm; }
 
-  /* ✅ تحسين طباعة الألوان */
   *{
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  html, body{
-    height:auto !important;
-  }
+  html, body{ height:auto !important; }
 
   body{
     background:#fff !important;
@@ -576,10 +517,9 @@ html.authed #pinGate{
     direction: rtl !important;
   }
 
-  /* إخفاء عناصر واجهة التطبيق */
+  /* ✅ إخفاء عناصر التحكم فقط */
   .topbar,
   .navBar,
-  .footer2,
   .btn,
   .actions,
   .filters,
@@ -592,14 +532,14 @@ html.authed #pinGate{
     display:none !important;
   }
 
-  /* توسيع المحتوى */
+  /* ✅ توسيع المحتوى */
   .container{
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* كروت الطباعة بدون ظل */
+  /* ✅ كروت الطباعة بدون ظل */
   .card,
   .printCard{
     box-shadow:none !important;
@@ -613,13 +553,9 @@ html.authed #pinGate{
     padding-bottom: 8px !important;
     margin-bottom: 10px !important;
   }
-  .printHeader .title{
-    font-size: 14pt !important;
-  }
+  .printHeader .title{ font-size: 14pt !important; }
   .printHeader .sub,
-  .miniMuted{
-    font-size: 10pt !important;
-  }
+  .miniMuted{ font-size: 10pt !important; }
 
   .kv{
     background:#fff !important;
@@ -627,9 +563,7 @@ html.authed #pinGate{
   }
   .kv .k{ color:#475569 !important; }
 
-  .miniTable{
-    border:1px solid #e5e7eb !important;
-  }
+  .miniTable{ border:1px solid #e5e7eb !important; }
   .miniTable th{
     background:#f8fafc !important;
     color:#0f172a !important;
@@ -642,59 +576,51 @@ html.authed #pinGate{
   }
 
   /* ✅ السجل الكبير */
-  .tableWrap{
-    border:0 !important;
-    overflow:visible !important;
-  }
+  .tableWrap{ border:0 !important; overflow:visible !important; }
   .table{
     min-width: 0 !important;
     width: 100% !important;
     font-size: 10.5pt !important;
   }
-  .table th, .table td{
-    padding: 7px 7px !important;
-  }
+  .table th, .table td{ padding: 7px 7px !important; }
+  .table th{ position: static !important; }
 
-  /* إلغاء sticky في الطباعة */
-  .table th{
-    position: static !important;
-  }
-
-  /* ✅ منع انقسام الكروت بين الصفحات */
-  .card, .printCard, .kv, .tableWrap{
+  /* ✅ منع انقسام الكروت */
+  .card, .printCard, .kv, .tableWrap, .footer2, .qrFooter{
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
-  /* ✅ لو صفحات المعاينة: خلّيها تملأ الورقة */
-  .previewWrap{
+  .previewWrap{ display:block !important; }
+
+  /* ✅ (مهم) الفوتر يظهر في الطباعة */
+  .footer2{
     display:block !important;
-  }
-
-  /* ✅ Print footer */
-  .printFooter{
-    display:flex !important;
-    border-top:1px dashed #e5e7eb !important;
-    margin-top:10mm !important;
-    padding-top:6mm !important;
-  }
-  .printFooter .pfMeta{
+    background: transparent !important;
     color:#0f172a !important;
-    opacity:1 !important;
-    font-size:10pt !important;
+    padding: 10mm 0 4mm !important;
+    margin-top: 8mm !important;
+    border-top: 1px dashed #e5e7eb !important;
+    text-align:center !important;
   }
-  .printFooter img{
-    width:38mm !important;
-    max-width:55mm !important;
-    padding:4mm !important;
-    border:1px solid #e5e7eb !important;
-    background:#fff !important;
-    border-radius:6mm !important;
+  .footer2 .muted2{
+    color: rgba(15,23,42,.70) !important;
   }
 
-  /* ✅ منع تكرار QR Footer */
+  /* ✅ (مهم) الـ QR يظهر في الطباعة */
   .qrFooter{
-    display:none !important;
+    display:block !important;
+    text-align:center !important;
+    padding: 6mm 0 0 !important;
+    margin-top: 0 !important;
+  }
+  .qrFooter img{
+    width: 38mm !important;
+    max-width: 55mm !important;
+    padding: 4mm !important;
+    border: 1px solid #e5e7eb !important;
+    background: #fff !important;
+    border-radius: 6mm !important;
   }
 }
 
@@ -704,7 +630,7 @@ html.authed #pinGate{
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  padding-inline-end: 38px; /* مساحة للسهم */
+  padding-inline-end: 38px;
   background-image:
     linear-gradient(45deg, transparent 50%, rgba(231,238,252,.85) 50%),
     linear-gradient(135deg, rgba(231,238,252,.85) 50%, transparent 50%);
@@ -719,9 +645,7 @@ html.authed #pinGate{
 
 /* ✅ Mobile: خلّي العناصر تملى العرض وتتراص تحت بعض */
 @media (max-width: 560px){
-  .ledger{
-    width: 100%;
-  }
+  .ledger{ width: 100%; }
   .ledger select,
   .ledger input,
   .ledger button{
@@ -734,7 +658,6 @@ html.authed #pinGate{
    ✅ REPORTS PAGE (NEW)
    ========================================================= */
 
-/* شريط فلاتر التقارير */
 .repToolbar{
   display:flex;
   gap:10px;
@@ -742,26 +665,18 @@ html.authed #pinGate{
   align-items:flex-end;
   justify-content:space-between;
 }
-
 .repFilters{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
   align-items:flex-end;
 }
-
-.repFilters .field{
-  min-width: 180px;
-}
-
+.repFilters .field{ min-width: 180px; }
 .repFilters .field.sm{ min-width: 150px; }
 .repFilters .field.lg{ min-width: 260px; }
 
 @media (max-width: 560px){
-  .repToolbar,
-  .repFilters{
-    width:100%;
-  }
+  .repToolbar, .repFilters{ width:100%; }
   .repFilters .field,
   .repFilters .field.sm,
   .repFilters .field.lg{
@@ -770,31 +685,26 @@ html.authed #pinGate{
   }
 }
 
-/* KPIs الخاصة بالتقارير */
 .repKpis{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap:10px;
   margin-top: 12px;
 }
-
 @media (max-width: 980px){
   .repKpis{ grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 
-/* تقسيمة جدولين (عمليات / مدفوعات) */
 .repSplit{
   display:grid;
   grid-template-columns: 1fr 1fr;
   gap:14px;
   margin-top: 12px;
 }
-
 @media (max-width: 980px){
   .repSplit{ grid-template-columns: 1fr; }
 }
 
-/* عنوان صغير فوق كل جدول في التقارير */
 .repTitle{
   display:flex;
   align-items:center;
@@ -802,29 +712,12 @@ html.authed #pinGate{
   gap:10px;
   margin: 8px 0 10px;
 }
-.repTitle h3{
-  margin:0;
-  font-size:14px;
-}
-.repTitle .muted{
-  color: var(--muted);
-  font-size: 12px;
-}
+.repTitle h3{ margin:0; font-size:14px; }
+.repTitle .muted{ color: var(--muted); font-size: 12px; }
 
-/* جدول التقارير يكون أخف شوية */
-.repTable{
-  min-width: 780px; /* أقل من جدول السجل */
-}
-@media (max-width: 980px){
-  .repTable{ min-width: 680px; }
-}
-@media (max-width: 560px){
-  .repTable{ min-width: 640px; }
-}
-
-/* =========================================================
-   ✅ Payment Flow Select (payFlow) — مظهر متناسق
-   ========================================================= */
+.repTable{ min-width: 780px; }
+@media (max-width: 980px){ .repTable{ min-width: 680px; } }
+@media (max-width: 560px){ .repTable{ min-width: 640px; } }
 
 #payFlow{
   appearance:none;
@@ -843,30 +736,11 @@ html.authed #pinGate{
   background-repeat:no-repeat;
 }
 
-/* =========================================================
-   ✅ Print: Reports page تحسين
-   ========================================================= */
 @media print{
-  /* لو صفحة التقارير ظاهرة: خلي كروت التقارير تظهر */
-  #page-reports .card{
-    display:block !important;
-  }
-
-  /* داخل التقارير: نخلي الجداول تاخد العرض */
-  #page-reports .repSplit{
-    display:block !important;
-  }
-
-  /* الجداول في التقارير */
-  #page-reports .tableWrap{
-    border: 1px solid #e5e7eb !important;
-  }
-  #page-reports table{
-    width:100% !important;
-    min-width:0 !important;
-  }
-
-  /* KPIs التقارير */
+  #page-reports .card{ display:block !important; }
+  #page-reports .repSplit{ display:block !important; }
+  #page-reports .tableWrap{ border: 1px solid #e5e7eb !important; }
+  #page-reports table{ width:100% !important; min-width:0 !important; }
   #page-reports .repKpis{
     display:grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
