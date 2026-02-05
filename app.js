@@ -955,6 +955,23 @@ function cleanupLegacyInjectedFooters(){
 }
 function preparePrintForCurrentPage(){
   cleanupLegacyInjectedFooters();
+
+  // ✅ اجعل الطباعة موحّدة: اطبع الصفحة الظاهرة فقط + هيدر للطباعة
+  document.querySelectorAll("#appRoot .page").forEach(p => p.classList.remove("printActive"));
+  const activePage = Array.from(document.querySelectorAll("#appRoot .page"))
+    .find(p => !p.hidden) || null;
+  if(activePage) activePage.classList.add("printActive");
+
+  const titleEl =
+    activePage?.querySelector(".pageHead h2") ||
+    activePage?.querySelector(".previewHead h2") ||
+    null;
+  const title = titleEl ? titleEl.textContent.trim() : "طباعة";
+
+  const phTitle = document.getElementById("printHeaderTitle");
+  const phMeta  = document.getElementById("printHeaderMeta");
+  if(phTitle) phTitle.textContent = title;
+  if(phMeta)  phMeta.textContent = new Date().toLocaleString("ar-EG");
 }
 window.addEventListener("beforeprint", preparePrintForCurrentPage);
 
@@ -1443,8 +1460,38 @@ function setLoading(isLoading){
   document.documentElement.classList.toggle("isLoading", !!isLoading);
 }
 
+/* ✅ Loading Overlay (جارِ تحديث البيانات) */
+function showOverlay(text){
+  const ov = document.getElementById("loadingOverlay");
+  if(!ov) return;
+  const t = document.getElementById("loadingOverlayText");
+  if(t && text) t.textContent = text;
+  ov.hidden = false;
+}
+function hideOverlay(){
+  const ov = document.getElementById("loadingOverlay");
+  if(!ov) return;
+  ov.hidden = true;
+}
+
 /* -------------------- Refresh (تحميل من الشيت) -------------------- */
 let __refreshLock = false;
+
+/* ✅ بصمة بسيطة لتقليل إعادة الرندر لو الداتا لم تتغير */
+function fingerprintState(entries, payments, trash){
+  const maxCreated = (arr)=> (Array.isArray(arr) && arr.length)
+    ? Math.max(...arr.map(x=> Number(x?.createdAt || x?.at || 0)))
+    : 0;
+  return [
+    Array.isArray(entries)? entries.length:0,
+    Array.isArray(payments)? payments.length:0,
+    Array.isArray(trash)? trash.length:0,
+    maxCreated(entries),
+    maxCreated(payments),
+    maxCreated(trash)
+  ].join("|");
+}
+
 async function refresh(forceNetwork = false){
   if(__refreshLock) return;
   __refreshLock = true;
@@ -1452,6 +1499,7 @@ async function refresh(forceNetwork = false){
   try{
     hideGlobalError();
     setLoading(true);
+    showOverlay("جارِ تحديث البيانات…");
 
     // ✅ دايمًا اعرض المحلي الأول (يمنع اختفاء الأرقام بعد Refresh)
     const local = await STORE.local.getAll();
@@ -1467,9 +1515,12 @@ async function refresh(forceNetwork = false){
 
     // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
     if(!forceNetwork){
+      hideOverlay();
       setLoading(false);
       return;
     }
+
+    const beforeFp = fingerprintState(STATE.entries, STATE.payments, STATE.trash);
 
     const all = await STORE.getAll();
 
@@ -1498,6 +1549,7 @@ async function refresh(forceNetwork = false){
         : "حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اضغط إعادة المحاولة.";
     showGlobalError(msg);
   }finally{
+    hideOverlay();
     setLoading(false);
     __refreshLock = false;
   }

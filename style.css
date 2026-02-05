@@ -495,6 +495,69 @@ html.authed #pinGate{ display:none !important; }
 .miniTable td.num{text-align:left}
 .miniMuted{color:var(--muted); font-size:12px; margin-top:8px}
 
+
+/* =========================================================
+   ✅ Loading Overlay
+   ========================================================= */
+.loadingOverlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(3,6,18,.55);
+  backdrop-filter: blur(6px);
+}
+.loadingCard{
+  width:min(360px, 92vw);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
+  box-shadow: 0 18px 60px rgba(0,0,0,.55);
+  padding:18px 16px;
+  text-align:center;
+}
+.spinner{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(0,188,212,.95);
+  margin: 0 auto 10px;
+  animation: spin .9s linear infinite;
+}
+.loadingText{
+  font-weight:900;
+  margin-top:6px;
+}
+.loadingSub{
+  margin-top:6px;
+  color: rgba(169,183,208,.92);
+  font-size:12px;
+}
+@keyframes spin{ to{ transform: rotate(360deg); } }
+
+
+/* =========================================================
+   ✅ Print Header Bar (يظهر في الطباعة فقط)
+   ========================================================= */
+.printHeaderBar{
+  display:none;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border:1px solid var(--stroke);
+  border-radius: 14px;
+  background: rgba(255,255,255,.04);
+}
+.printHeaderBar .phShop{ font-weight:900; font-size:16px; }
+.printHeaderBar .phAdmin{ color: var(--muted); font-size:12px; margin-top:4px; }
+.printHeaderBar .phTitle{ font-weight:900; font-size:14px; }
+.printHeaderBar .phMeta{ color: var(--muted); font-size:12px; margin-top:4px; }
+
 /* =========================================================
    ✅ PRINT MODE (Save as PDF) — محسّن A4
    ✅ المطلوب: الفوتر + QR يظهروا في الطباعة
@@ -516,6 +579,13 @@ html.authed #pinGate{ display:none !important; }
     line-height: 1.35 !important;
     direction: rtl !important;
   }
+
+  /* ✅ أظهر هيدر الطباعة + اطبع الصفحة الحالية فقط */
+  #printHeader{ display:flex !important; }
+  #loadingOverlay{ display:none !important; }
+
+  #appRoot .page{ display:none !important; }
+  #appRoot .page.printActive{ display:block !important; }
 
   /* ✅ إخفاء عناصر التحكم فقط */
   .topbar,
