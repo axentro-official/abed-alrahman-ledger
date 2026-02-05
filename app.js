@@ -16,7 +16,7 @@ const PIN_CODE = "1234";
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbxYa-2Sd8L2c8lUEe9YLQfWvIstWsqbXoiqZnsmIvPrWMPcv0ys12_BJS7RVlhhcCgwVg/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
   pin: "1234"
 };
 
@@ -410,10 +410,19 @@ const API_CFG = (window.AXENTRO_API && typeof window.AXENTRO_API === "object")
 const API_ACTIONS = {
   init: "init",
   getAll: "getAll",
+
   addEntry: "addEntry",
   addPayment: "addPayment",
+
   deleteEntry: "deleteEntry",
   deletePayment: "deletePayment",
+
+  // ✅ Restore / Purge (Sheets)
+  restoreEntryCascade: "restoreEntryCascade",
+  restorePayment: "restorePayment",
+  purgeEntry: "purgeEntry",
+  purgePayment: "purgePayment",
+
   getTrash: "getTrash",
   deleteTrashLog: "deleteTrashLog"
 };
@@ -500,6 +509,11 @@ class LocalStore {
     return all.trash || [];
   }
   async deleteTrashLog(logId){
+
+  async restoreEntryCascade(entryId){ await apiCall(API_ACTIONS.restoreEntryCascade, { entryId }); }
+  async restorePayment(payId){ await apiCall(API_ACTIONS.restorePayment, { payId }); }
+  async purgeEntry(entryId){ await apiCall(API_ACTIONS.purgeEntry, { entryId }); }
+  async purgePayment(payId){ await apiCall(API_ACTIONS.purgePayment, { payId }); }
     const rawT = localStorage.getItem(TRASH_KEY);
     const t = rawT ? JSON.parse(rawT) : { logs: [] };
     t.logs = (t.logs || []).filter(x => x.id !== logId);
@@ -641,6 +655,11 @@ class HybridStore {
   }
 
   async deleteTrashLog(logId){
+
+  async restoreEntryCascade(entryId){ if(this.mode==="local") return; await this.sheets.restoreEntryCascade(entryId); }
+  async restorePayment(payId){ if(this.mode==="local") return; await this.sheets.restorePayment(payId); }
+  async purgeEntry(entryId){ if(this.mode==="local") return; await this.sheets.purgeEntry(entryId); }
+  async purgePayment(payId){ if(this.mode==="local") return; await this.sheets.purgePayment(payId); }
     if(this.mode === "local"){
       return await this.local.deleteTrashLog(logId);
     }
@@ -1287,7 +1306,10 @@ function renderTrash(){
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
       <td>
-        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
+        <div class="rowActions">
+          <button class="btn small" data-trashrestore="${item.id}">استرجاع</button>
+          <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1785,29 +1807,70 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    // Trash delete forever
+    // Trash restore / purge
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
-      const logId = btn.dataset.trashdel;
-      if(!logId) return;
 
-      const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
-      if(!okPin) return;
+      const restoreId = btn.dataset.trashrestore;
+      const purgeId = btn.dataset.trashdel;
 
-      if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
+      if(restoreId){
+        const okPin = await pinConfirmModalOpen("استرجاع من المحذوفات");
+        if(!okPin) return;
+
+        const log = (STATE.trash||[]).find(x=>String(x.id)===String(restoreId));
+        if(!log) return;
+
+        const table = String(log.refTable||"");
+        const refId = String(log.refId||"");
+
         try{
-          await STORE.deleteTrashLog(logId);
+          if(table === "Transactions"){
+            await STORE.restoreEntryCascade(refId);
+          }else{
+            await STORE.restorePayment(refId);
+          }
+          // تنظيف محلي: السطر يختفي فورًا
+          try{ await STORE.deleteTrashLog(restoreId); }catch(_e){}
           STATE.trash = await STORE.getTrash();
           renderTrash();
+          await refresh(true);
         }catch(e){
           console.error(e);
-          showGlobalError("تعذر حذف السطر من الشيت. تم الحذف محليًا إذا كان الوضع Offline.");
+          showGlobalError("تعذر الاسترجاع على الشيت. تأكد أن WebApp محدث ومُعاد نشره.");
         }
+        return;
       }
-    });
 
-  }catch(e){
+      if(!purgeId) return;
+
+      const okPin = await pinConfirmModalOpen("الحذف النهائي");
+      if(!okPin) return;
+
+      if(!confirm("متأكد حذف نهائي؟ سيتم حذف السجل نهائيًا من الشيت ولن يمكن استرجاعه.")) return;
+
+      const log = (STATE.trash||[]).find(x=>String(x.id)===String(purgeId));
+      if(!log) return;
+
+      const table = String(log.refTable||"");
+      const refId = String(log.refId||"");
+
+      try{
+        if(table === "Transactions"){
+          await STORE.purgeEntry(refId);
+        }else{
+          await STORE.purgePayment(refId);
+        }
+        // تحديث
+        STATE.trash = await STORE.getTrash();
+        renderTrash();
+        await refresh(true);
+      }catch(e){
+        console.error(e);
+        showGlobalError("تعذر الحذف النهائي على الشيت. تأكد أن Apps Script يدعم purgeEntry/purgePayment ثم أعد النشر.");
+      }
+    });}catch(e){
     console.error(e);
     showGlobalError("فيه خطأ حصل في تشغيل الصفحة. جرّب تحديث الصفحة أو امسح كاش الموقع.");
   }
