@@ -817,3 +817,76 @@ html.authed #pinGate{ display:none !important; }
     gap:10px !important;
   }
 }
+
+/* ✅ Refresh Overlay (Centered) */
+#loadingOverlay, .loadingOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(6, 10, 20, .55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+#loadingOverlay[hidden], .loadingOverlay[hidden]{
+  display: none !important;
+}
+
+#loadingOverlay .loadingCard,
+.loadingOverlay .loadingCard{
+  width: min(520px, 92vw);
+  background: rgba(15, 26, 46, .92);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgba(0,0,0,.55);
+  padding: 18px 18px 16px;
+}
+
+#loadingOverlay .loadingRow,
+.loadingOverlay .loadingRow{
+  display:flex;
+  gap: 12px;
+  align-items: center;
+}
+
+#loadingOverlay .loadingSpinner,
+.loadingOverlay .loadingSpinner{
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid rgba(231,238,252,.25);
+  border-top-color: rgba(231,238,252,.95);
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+
+#loadingOverlay .loadingText,
+.loadingOverlay .loadingText{
+  flex:1;
+  min-width: 0;
+}
+
+#loadingOverlay .loadingTitle,
+.loadingOverlay .loadingTitle{
+  font-weight: 900;
+  letter-spacing: .2px;
+  margin: 0 0 2px;
+  color: rgba(231,238,252,.98);
+}
+
+#loadingOverlay .loadingSub,
+.loadingOverlay .loadingSub{
+  margin: 0;
+  color: rgba(169,183,208,.92);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media print{
+  #loadingOverlay, .loadingOverlay{ display:none !important; }
+}
