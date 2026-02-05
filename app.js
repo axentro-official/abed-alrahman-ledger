@@ -79,56 +79,6 @@ function escapeHtml(str){
     .replaceAll("'", "&#039;");
 }
 
-/* -------------------- ✅ Trash Normalizer (Sheets/Local compatible) -------------------- */
-function normalizeTrashItem(it){
-  if(!it || typeof it !== "object") return null;
-
-  let obj = { ...it };
-
-  // snapshotJson (string) -> parsed object fields
-  const snapStr = obj.snapshotJson || obj.snapshotJSON || obj.snapshot;
-  if(typeof snapStr === "string" && snapStr.trim()){
-    try{
-      const parsed = JSON.parse(snapStr);
-      if(parsed && typeof parsed === "object"){
-        obj = { ...obj, ...parsed };
-      }
-    }catch(_e){}
-  }
-
-  // at: UI expects item.at; Sheets may send deletedAt
-  let at = obj.at ?? obj.deletedAt ?? obj.deleted_at ?? obj.time ?? obj.ts ?? obj.createdAt;
-  if(typeof at === "string" && /^\d+$/.test(at)) at = Number(at);
-  if(!Number.isFinite(Number(at))) at = Date.now();
-  obj.at = Number(at);
-
-  // type: UI expects delete_entry / delete_payment
-  if(!obj.type){
-    const reason = String(obj.reason || "").toLowerCase();
-    const refTbl = String(obj.refTable || "").toLowerCase();
-    if(reason.includes("entry") || reason.includes("transaction") || refTbl.includes("entries") || refTbl.includes("transactions")){
-      obj.type = "delete_entry";
-    }else if(reason.includes("payment") || refTbl.includes("payments")){
-      obj.type = "delete_payment";
-    }else{
-      // fallback
-      obj.type = (obj.entrySnapshot || obj.paymentsSnapshot) ? "delete_entry" : "delete_payment";
-    }
-  }
-
-  // id fallback
-  if(!obj.id) obj.id = obj.logId || obj.refId || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-  return obj;
-}
-function normalizeTrash(list){
-  return (Array.isArray(list) ? list : [])
-    .map(normalizeTrashItem)
-    .filter(Boolean);
-}
-/* ------------------------------------------------------------------------------ */
-
-
 /* ✅ Labels */
 function flowLabel(flow){
   return flow === "in" ? "متحصلات داخلة" : "مدفوعات خارجة";
@@ -780,30 +730,6 @@ async function renderFromState(){
   if(reportsPage && !reportsPage.hidden) renderReports();
 }
 
-async function renderFromStatePartial(flags = {}){
-  const entriesChanged = !!flags.entriesChanged;
-  const paymentsChanged = !!flags.paymentsChanged;
-  const trashChanged = !!flags.trashChanged;
-
-  // KPIs تعتمد على entries + payments
-  if(entriesChanged || paymentsChanged){
-    const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
-    renderKPIs(entriesView, STATE.payments);
-
-    // جدول العمليات يعتمد على الاتنين
-    await renderEntriesTable(applyEntryFilters(entriesView));
-
-    // جدول المدفوعات يعتمد على الاتنين (مرجع/party/ref)
-    await renderPaymentsTable(STATE.payments, STATE.entries);
-  }
-
-  const trashPage = document.getElementById("page-trash");
-  if(trashChanged && trashPage && !trashPage.hidden) renderTrash();
-
-  const reportsPage = document.getElementById("page-reports");
-  if((entriesChanged || paymentsChanged) && reportsPage && !reportsPage.hidden) renderReports();
-}
-
 /* -------------------- Render KPIs -------------------- */
 function computeTotals(entriesView, payments){
   const expensesTotal = entriesView
@@ -1307,65 +1233,6 @@ function openLedgerPreview(){
   showPage("ledgerPreview");
 }
 
-
-async function restoreTrashLogById(logId){
-  const logRaw = (Array.isArray(STATE.trash) ? STATE.trash : []).find(x => String(x.id) === String(logId));
-  if(!logRaw) return;
-
-  const log = normalizeTrashItem(logRaw);
-  if(!log) return;
-
-  const okPin = await pinConfirmModalOpen("استرجاع من المحذوفات");
-  if(!okPin) return;
-
-  const kindLabel = (log.type === "delete_entry") ? "عملية" : "دفعة";
-  if(!confirm(`متأكد استرجاع ${kindLabel}؟\nبعد الاسترجاع سيتم حذف هذا السطر من سجل المحذوفات.`)){
-    return;
-  }
-
-  // Restore
-  if(log.type === "delete_entry"){
-    const entry = log.entrySnapshot || null;
-    const pays  = Array.isArray(log.paymentsSnapshot) ? log.paymentsSnapshot : [];
-
-    if(entry && entry.id){
-      const exists = STATE.entries.some(e => e.id === entry.id);
-      if(!exists){
-        try{ await STORE.addEntry(entry); }
-        catch(e){ console.error(e); showGlobalError("تعذر استرجاع العملية على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
-      }
-
-      // Restore payments (skip duplicates)
-      for(const p of pays){
-        if(!p || !p.id) continue;
-        const payExists = STATE.payments.some(x => x.id === p.id);
-        if(payExists) continue;
-        try{ await STORE.addPayment(p); }
-        catch(e){ console.error(e); showGlobalError("تعذر استرجاع بعض المدفوعات على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
-      }
-    }
-  }else{
-    const pay = log.paymentSnapshot || null;
-    if(pay && pay.id){
-      const payExists = STATE.payments.some(x => x.id === pay.id);
-      if(!payExists){
-        try{ await STORE.addPayment(pay); }
-        catch(e){ console.error(e); showGlobalError("تعذر استرجاع الدفعة على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
-      }
-    }
-  }
-
-  // Remove trash log after restore
-  try{
-    await STORE.deleteTrashLog(logId);
-  }catch(e){
-    console.error(e);
-    showGlobalError("تم الاسترجاع لكن تعذر حذف السطر من سجل المحذوفات على الشيت (قد يختفي محليًا فقط).");
-  }
-
-  await refresh(true);
-}
-
 /* -------------------- Trash Page -------------------- */
 function renderTrash(){
   const tbody = el("trashTbody");
@@ -1420,10 +1287,7 @@ function renderTrash(){
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
       <td>
-        <div class="rowActions">
-          <button class="btn small" data-trashrestore="${item.id}">استرجاع</button>
-          <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
-        </div>
+        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1591,50 +1455,6 @@ function renderReports(){
 }
 
 
-
-/* -------------------- ✅ Store Mode Badge (Local / Sheets) -------------------- */
-let __storeStatus = { mode: null, note: "" };
-
-function ensureStoreBadge(){
-  if(document.getElementById("storeModeBadge")) return;
-
-  const b = document.createElement("div");
-  b.id = "storeModeBadge";
-  b.style.position = "fixed";
-  b.style.top = "10px";
-  b.style.left = "10px";
-  b.style.zIndex = "9998";
-  b.style.padding = "6px 10px";
-  b.style.borderRadius = "999px";
-  b.style.fontSize = "12px";
-  b.style.fontWeight = "800";
-  b.style.background = "rgba(0,0,0,.35)";
-  b.style.border = "1px solid rgba(255,255,255,.12)";
-  b.style.backdropFilter = "blur(6px)";
-  b.style.userSelect = "none";
-  b.style.cursor = "help";
-  b.textContent = "● …";
-  document.body.appendChild(b);
-
-  b.addEventListener("click", ()=>{
-    // click = show tooltip via native title only (no alerts)
-  });
-}
-
-function setStoreStatus(mode, note = ""){
-  __storeStatus.mode = mode;
-  __storeStatus.note = note || "";
-  const b = document.getElementById("storeModeBadge");
-  if(!b) return;
-
-  const label = (mode === "sheets") ? "Sheets" : "Local";
-  b.textContent = `● ${label}`;
-  b.title = mode === "sheets"
-    ? "المصدر: Google Sheets (متصل)"
-    : ("المصدر: LocalStorage (Offline/تعذر الشيت)" + (__storeStatus.note ? `\nالسبب: ${__storeStatus.note}` : ""));
-}
-/* --------------------------------------------------------------------------- */
-
 /* -------------------- Loading State (خفيف) -------------------- */
 function setLoading(isLoading){
   document.documentElement.classList.toggle("isLoading", !!isLoading);
@@ -1672,20 +1492,6 @@ function fingerprintState(entries, payments, trash){
   ].join("|");
 }
 
-function fingerprintSlice(arr){
-  const a = Array.isArray(arr) ? arr : [];
-  const len = a.length;
-  let maxT = 0;
-  let lastId = "";
-  for(const x of a){
-    const t = Number(x?.createdAt || x?.at || 0);
-    if(Number.isFinite(t) && t > maxT) maxT = t;
-    if(!lastId && x?.id) lastId = String(x.id);
-  }
-  return `${len}|${maxT}|${lastId}`;
-}
-
-
 async function refresh(forceNetwork = false){
   if(__refreshLock) return;
   __refreshLock = true;
@@ -1695,36 +1501,26 @@ async function refresh(forceNetwork = false){
     setLoading(true);
     showOverlay("جارِ تحديث البيانات…");
 
-    // ✅ Badge
-    ensureStoreBadge();
-    setStoreStatus(STORE.mode, "");
-
-    // ✅ اعرض المحلي الأول دائمًا (يمنع اختفاء الأرقام بعد Refresh)
+    // ✅ دايمًا اعرض المحلي الأول (يمنع اختفاء الأرقام بعد Refresh)
     const local = await STORE.local.getAll();
-    STATE.entries  = Array.isArray(local.entries) ? local.entries : [];
+    STATE.entries = Array.isArray(local.entries) ? local.entries : [];
     STATE.payments = Array.isArray(local.payments) ? local.payments : [];
-    STATE.trash    = normalizeTrash(Array.isArray(local.trash) ? local.trash : []);
+    STATE.trash = Array.isArray(local.trash) ? local.trash : [];
 
-    // ✅ تطبيع التواريخ + تدفقات المدفوعات
-    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
-    STATE.payments = (STATE.payments || []).map(p => ({
-      ...p,
-      date: normalizeISODate(p.date),
-      flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
-    }));
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
 
     await renderFromState();
 
     // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
     if(!forceNetwork){
+      hideOverlay();
+      setLoading(false);
       return;
     }
 
-    const before = {
-      entries: fingerprintSlice(STATE.entries),
-      payments: fingerprintSlice(STATE.payments),
-      trash: fingerprintSlice(STATE.trash)
-    };
+    const beforeFp = fingerprintState(STATE.entries, STATE.payments, STATE.trash);
 
     const all = await STORE.getAll();
 
@@ -1733,40 +1529,20 @@ async function refresh(forceNetwork = false){
       flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
     }));
 
-    STATE.entries  = Array.isArray(all.entries) ? all.entries : [];
+    STATE.entries = Array.isArray(all.entries) ? all.entries : [];
     STATE.payments = payments;
-    STATE.trash    = normalizeTrash(Array.isArray(all.trash) ? all.trash : []);
+    STATE.trash = Array.isArray(all.trash) ? all.trash : [];
 
-    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
     STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
 
-    // ✅ Update badge
-    setStoreStatus(STORE.mode, "");
 
-    const after = {
-      entries: fingerprintSlice(STATE.entries),
-      payments: fingerprintSlice(STATE.payments),
-      trash: fingerprintSlice(STATE.trash)
-    };
-
-    const entriesChanged  = before.entries  !== after.entries;
-    const paymentsChanged = before.payments !== after.payments;
-    const trashChanged    = before.trash    !== after.trash;
-
-    // ✅ Diff-based: لو مفيش تغيير، لا تعيد الرندر
-    if(!(entriesChanged || paymentsChanged || trashChanged)){
-      return;
-    }
-
-    // ✅ Partial render حسب التغيير
-    await renderFromStatePartial({ entriesChanged, paymentsChanged, trashChanged });
+    await renderFromState();
     hideGlobalError();
 
   }catch(e){
     console.error(e);
-    // ✅ Update badge to local with note
-    setStoreStatus("local", String(e?.message || e || "").slice(0, 120));
-
     const msg =
       (STORE.mode === "local")
         ? "تعذر تحميل البيانات من الشيت. جاري استخدام التخزين المحلي مؤقتًا."
@@ -1779,15 +1555,11 @@ async function refresh(forceNetwork = false){
   }
 }
 
-
 /* -------------------- DOM Events -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   try{
     ensureGlobalBanner();
     setupPinGate();
-
-    ensureStoreBadge();
-    setStoreStatus(STORE.mode, "");
 
     if(isAuthed()){
       document.documentElement.classList.add("authed");
@@ -1796,7 +1568,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       try{ await STORE.init(); }
       catch(e){
         console.error(e);
-        setStoreStatus("local", "تعذر التهيئة");
         showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
       }
 
@@ -2018,23 +1789,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
-
-      const restoreId = btn.dataset.trashrestore;
-      if(restoreId){
-        await restoreTrashLogById(restoreId);
-        return;
-      }
-
-      const delId = btn.dataset.trashdel;
-      if(!delId) return;
+      const logId = btn.dataset.trashdel;
+      if(!logId) return;
 
       const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
       if(!okPin) return;
 
       if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
         try{
-          await STORE.deleteTrashLog(delId);
-          STATE.trash = normalizeTrash(await STORE.getTrash());
+          await STORE.deleteTrashLog(logId);
+          STATE.trash = await STORE.getTrash();
           renderTrash();
         }catch(e){
           console.error(e);
@@ -2042,7 +1806,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     });
-
 
   }catch(e){
     console.error(e);
