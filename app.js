@@ -334,6 +334,13 @@ function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
 
     err.hidden = true;
     inp.value = "";
+
+    // ✅ تحديث عنوان/وصف المودال حسب العملية (حذف / استرجاع / إلخ)
+    const h3 = modal.querySelector("h3");
+    const lbl = modal.querySelector("label");
+    if(h3) h3.textContent = `تأكيد ${actionText}`;
+    if(lbl) lbl.textContent = `أدخل PIN (${PIN_CODE}) لإتمام ${actionText}`;
+
     modal.hidden = false;
 
     const cleanup = ()=>{
@@ -1600,6 +1607,8 @@ function ensureStoreBadge(){
 
   const b = document.createElement("div");
   b.id = "storeModeBadge";
+
+  // ✅ base style (will be positioned safely by positionStoreBadge)
   b.style.position = "fixed";
   b.style.top = "10px";
   b.style.left = "10px";
@@ -1613,12 +1622,71 @@ function ensureStoreBadge(){
   b.style.backdropFilter = "blur(6px)";
   b.style.userSelect = "none";
   b.style.cursor = "help";
+  b.style.maxWidth = "70vw";
+  b.style.whiteSpace = "nowrap";
+  b.style.overflow = "hidden";
+  b.style.textOverflow = "ellipsis";
+
   b.textContent = "● …";
   document.body.appendChild(b);
 
-  b.addEventListener("click", ()=>{
-    // click = show tooltip via native title only (no alerts)
-  });
+  // لا نستخدم alert — فقط title
+  b.addEventListener("click", ()=>{});
+
+  // position now + on resize/orientation
+  positionStoreBadge();
+  window.addEventListener("resize", positionStoreBadge, { passive:true });
+  window.addEventListener("orientationchange", positionStoreBadge, { passive:true });
+}
+
+function positionStoreBadge(){
+  const b = document.getElementById("storeModeBadge");
+  if(!b) return;
+
+  // ✅ default (top-left)
+  b.style.top = "10px";
+  b.style.left = "10px";
+  b.style.right = "auto";
+
+  // ✅ if RTL UI & better spacing, keep it on the far edge away from actions when possible
+  const isSmall = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
+
+  // Try to avoid overlap with Logout button
+  const logout = document.getElementById("btnLogout");
+  if(logout){
+    const r1 = b.getBoundingClientRect();
+    const r2 = logout.getBoundingClientRect();
+    const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
+
+    if(overlap){
+      // Move badge below Logout button
+      const top = Math.round(r2.bottom + 8);
+      b.style.top = top + "px";
+      b.style.left = "10px";
+      b.style.right = "auto";
+    }
+  }
+
+  // ✅ On very small screens: prefer placing it to the far right (away from left actions)
+  if(isSmall){
+    // If there is an info button on the right, keep some margin
+    b.style.left = "auto";
+    b.style.right = "10px";
+
+    // Re-check overlap with logout when moved
+    const logout2 = document.getElementById("btnLogout");
+    if(logout2){
+      const r1 = b.getBoundingClientRect();
+      const r2 = logout2.getBoundingClientRect();
+      const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
+      if(overlap){
+        const top = Math.round(r2.bottom + 8);
+        b.style.top = top + "px";
+        b.style.left = "auto";
+        b.style.right = "10px";
+      }
+    }
+  }
 }
 
 function setStoreStatus(mode, note = ""){
