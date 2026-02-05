@@ -570,9 +570,7 @@ html.authed #pinGate{ display:none !important; }
     print-color-adjust: exact;
   }
 
-  html, body{ height:auto !important;   padding-top:70px !important;
-  padding-bottom:140px !important;
-}
+  html, body{ height:auto !important; }
 
   body{
     background:#fff !important;
@@ -583,21 +581,7 @@ html.authed #pinGate{ display:none !important; }
   }
 
   /* ✅ أظهر هيدر الطباعة + اطبع الصفحة الحالية فقط */
-  #printHeader{
-  display:flex !important;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  background:#fff !important;
-  border-bottom:1px solid #e5e7eb;
-  padding:10px 12px;
-  margin:0 !important;
-  position:fixed;
-  top:0;
-  left:0;
-  right:0;
-  z-index:9999;
-}
+  #printHeader{ display:flex !important; }
   #loadingOverlay{ display:none !important; }
 
   #appRoot .page{ display:none !important; }
@@ -708,38 +692,6 @@ html.authed #pinGate{ display:none !important; }
     background: #fff !important;
     border-radius: 6mm !important;
   }
-
-
-/* ✅ Footer + QR: ثابتين أسفل كل صفحة */
-.footer2{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:12px;
-  margin:0 !important;
-  padding:10px 12px !important;
-  background:#fff !important;
-  border-top:1px solid #e5e7eb;
-  text-align:center;
-  color:#000 !important;
-  z-index:9998;
-}
-.qrFooter{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:78px;
-  margin:0 !important;
-  padding:0 !important;
-  background:transparent !important;
-  display:flex !important;
-  justify-content:center;
-  z-index:9997;
-}
-.qrFooter img, .qrFooter canvas{
-  width:95px !important;
-  height:95px !important;
-}
 }
 
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
@@ -864,4 +816,58 @@ html.authed #pinGate{ display:none !important; }
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap:10px !important;
   }
+}
+
+
+
+/* =========================================================
+   ✅ Overlay Compatibility Patch
+   - يضمن ظهور الـ Overlay سواء كان بـ id أو class
+   ========================================================= */
+#loadingOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3,6,18,.55);
+  backdrop-filter: blur(6px);
+}
+
+/* دعم لو الـ HTML فيه class="loadingOverlay" (زي ما هو) */
+#loadingOverlay.loadingOverlay{}
+
+/* مكونات الكارت داخل الـ overlay (لو اتبعت structure القديم) */
+#loadingOverlay .loadingCard{
+  width:min(360px, 92vw);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
+  box-shadow: 0 18px 60px rgba(0,0,0,.55);
+  padding:18px 16px;
+  text-align:center;
+}
+#loadingOverlay .spinner{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(0,188,212,.95);
+  margin: 0 auto 10px;
+  animation: spin .9s linear infinite;
+}
+#loadingOverlay .loadingText{
+  font-weight:900;
+  margin-top:6px;
+}
+#loadingOverlay .loadingSub{
+  margin-top:6px;
+  color: rgba(169,183,208,.92);
+  font-size:12px;
+}
+
+/* تأكيد إخفاء الـ overlay أثناء الطباعة */
+@media print{
+  #loadingOverlay{ display:none !important; }
 }
