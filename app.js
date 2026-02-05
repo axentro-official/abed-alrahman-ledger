@@ -16,7 +16,7 @@ const PIN_CODE = "1234";
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbxYa-2Sd8L2c8lUEe9YLQfWvIstWsqbXoiqZnsmIvPrWMPcv0ys12_BJS7RVlhhcCgwVg/exec",
   pin: "1234"
 };
 
