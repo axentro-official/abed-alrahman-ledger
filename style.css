@@ -570,7 +570,9 @@ html.authed #pinGate{ display:none !important; }
     print-color-adjust: exact;
   }
 
-  html, body{ height:auto !important; }
+  html, body{ height:auto !important;   padding-top:70px !important;
+  padding-bottom:140px !important;
+}
 
   body{
     background:#fff !important;
@@ -581,7 +583,21 @@ html.authed #pinGate{ display:none !important; }
   }
 
   /* ✅ أظهر هيدر الطباعة + اطبع الصفحة الحالية فقط */
-  #printHeader{ display:flex !important; }
+  #printHeader{
+  display:flex !important;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  background:#fff !important;
+  border-bottom:1px solid #e5e7eb;
+  padding:10px 12px;
+  margin:0 !important;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:9999;
+}
   #loadingOverlay{ display:none !important; }
 
   #appRoot .page{ display:none !important; }
@@ -692,6 +708,38 @@ html.authed #pinGate{ display:none !important; }
     background: #fff !important;
     border-radius: 6mm !important;
   }
+
+
+/* ✅ Footer + QR: ثابتين أسفل كل صفحة */
+.footer2{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:12px;
+  margin:0 !important;
+  padding:10px 12px !important;
+  background:#fff !important;
+  border-top:1px solid #e5e7eb;
+  text-align:center;
+  color:#000 !important;
+  z-index:9998;
+}
+.qrFooter{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:78px;
+  margin:0 !important;
+  padding:0 !important;
+  background:transparent !important;
+  display:flex !important;
+  justify-content:center;
+  z-index:9997;
+}
+.qrFooter img, .qrFooter canvas{
+  width:95px !important;
+  height:95px !important;
+}
 }
 
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
