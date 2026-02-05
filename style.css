@@ -624,86 +624,6 @@ html.authed #pinGate{ display:none !important; }
   }
 }
 
-/* =========================
-   ✅ Print Fixes (v3)
-   الهدف: منع تكرار اسم المتجر/العناوين + منع صفحات فاضية + ترتيب الفوتر والـ QR
-   ========================= */
-@media print{
-  /* 1) امنع أي Overlay / Gate من الظهور (كان بيطبع "سوبر ماركت..." لوحدها) */
-  .gateWrap,
-  .gateOverlay,
-  .gateCard,
-  .gateTitle,
-  .gateSub,
-  .toast,
-  .toastWrap,
-  .loadingOverlay,
-  .overlay,
-  .modalBackdrop,
-  .modal{
-    display:none !important;
-  }
-
-  /* 2) اطبع المحتوى الفعلي (حل مشكلة زر الطباعة الرئيسي اللي بيطلع صفحة فاضية) */
-  body,
-  .app,
-  .main,
-  .container,
-  .pages,
-  .page{
-    display:block !important;
-  }
-  .page[hidden]{ display:none !important; }
-
-  /* 3) خلّي العناصر اللي بتكون Scrollable تظهر كاملة في الطباعة */
-  .tableWrap,
-  .tableScroll,
-  .scrollX,
-  .scrollY{
-    overflow: visible !important;
-    max-height: none !important;
-  }
-
-  /* 4) امنع تكرار/تداخل العناوين: خلي عنوان المتجر يطلع مرة واحدة فقط */
-  /* - العنوان اللي فوق خالص كان بيجي من الـ topbar (وإحياناً الـ gate) */
-  .topbar,
-  .tabs,
-  .nav,
-  .actionsBar,
-  .printBtn,
-  .btnPrint,
-  .noPrint{ display:none !important; }
-
-  /* - لو في عنوان صفحة ظاهر مرتين، خليه يظهر مرة واحدة (اللي جوه printCard فقط) */
-  .pageHead{ display:none !important; }
-  .printCard .pageHead{ display:block !important; }
-
-  /* 5) الفوتر + QR: يبقوا آخر الصفحة بدون ما يركبوا على بعض، وبدون صفحة إضافية فاضية */
-  .footer2,
-  .qrFooter{
-    position: static !important;
-    inset: auto !important;
-    transform: none !important;
-    page-break-before: auto !important;
-    break-before: auto !important;
-    page-break-after: auto !important;
-    break-after: auto !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  .footer2{ margin-top: 18px !important; }
-  .qrFooter{ margin-top: 10px !important; }
-  .qrBox{ margin: 0 auto !important; }
-
-  /* 6) منع تكسير الصفوف داخل الجداول قدر الإمكان */
-  table{ page-break-inside:auto; break-inside:auto; }
-  tr{ page-break-inside:avoid; break-inside:avoid; }
-  thead{ display: table-header-group; }
-  tfoot{ display: table-footer-group; }
-}
-
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
 .ledger select{
   min-width: 210px;
@@ -829,98 +749,170 @@ html.authed #pinGate{ display:none !important; }
 }
 
 /* =========================================================
-   ✅ Print Fix Pack (v3)
-   - يمنع تكرار اسم المتجر بسبب Gate/Overlay
-   - يمنع صفحات فاضية بسبب overflow/hidden أو عناصر مخفية
-   - يثبت الفوتر + QR أسفل المحتوى بدون تراكب ولا تكرار
+   ✅ Loading Overlay
    ========================================================= */
+.loadingOverlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(3,6,18,.55);
+  backdrop-filter: blur(6px);
+}
+.loadingCard{
+  width:min(360px, 92vw);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
+  box-shadow: 0 18px 60px rgba(0,0,0,.55);
+  padding:18px 16px;
+  text-align:center;
+}
+.spinner{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(0,188,212,.95);
+  margin: 0 auto 10px;
+  animation: spin .9s linear infinite;
+}
+.loadingText{
+  font-weight:900;
+  margin-top:6px;
+}
+.loadingSub{
+  margin-top:6px;
+  color: rgba(169,183,208,.92);
+  font-size:12px;
+}
+@keyframes spin{ to{ transform: rotate(360deg); } }
+
+
+/* =========================
+   ✅ Unified Print (No Duplicates)
+   ========================= */
 @media print{
-  /* خلفية وطباعة نظيفة */
+  :root{
+    --bg:#ffffff;
+    --card:#ffffff;
+    --card2:#ffffff;
+    --text:#000000;
+    --muted:#333333;
+    --stroke:rgba(0,0,0,.12);
+    --shadow:none;
+  }
+
   html, body{
     background:#fff !important;
     color:#000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* 1) اخفاء أي Gate/Overlay/Toast (كانت بتظهر نصوص لوحدها فوق) */
-  .gateWrap,
-  .gateOverlay,
-  .gateCard,
-  .gateTitle,
-  .gateSub,
-  .toast,
-  .toastWrap,
-  .modal,
-  .modalOverlay,
-  .overlay,
-  .overlayWrap{
-    display:none !important;
+  body{
+    margin: 0 !important;
   }
 
-  /* 2) اخفاء الهيدر/الناف/أزرار التحكم (لكن نخلي الـ printCard لو موجود) */
+  /* ✅ أخفي عناصر الواجهة (لكن سيب الـ printCard) */
   .topbar,
   .tabs,
-  .tabbar,
-  .btn,
-  .btnRow,
-  .noPrint,
-  .hideOnPrint,
+  .nav,
+  .sidebar,
   .actions,
   .actionBtns,
-  .floatingBtn{
+  .previewActions,
+  .btn,
+  button,
+  .no-print,
+  .logoutBtn,
+  .printBtn{
     display:none !important;
   }
 
-  /* 3) تأكيد إظهار الصفحات الفعلية وعدم اختفائها */
-  .page,
-  .pageContent,
-  .container,
-  .wrap,
-  main,
-  #app,
-  body{
+  /* ✅ أخفي أي عنوان/هيدر واجهة ممكن يكرر اسم السوبر ماركت */
+  header,
+  .brand,
+  .brandTitle,
+  .appTitle,
+  .pageTitle,
+  .sectionTitle,
+  .siteTitle{
+    display:none !important;
+  }
+
+  /* ✅ أخفي الأوفرلاي في الطباعة */
+  .loadingOverlay{ display:none !important; }
+
+  /* ✅ الكارت الخاص بالطباعة */
+  .printCard{
     display:block !important;
-    visibility:visible !important;
+    background:#fff !important;
+    color:#000 !important;
+    border: 1px solid rgba(0,0,0,.12) !important;
+    box-shadow:none !important;
   }
-  .page[hidden]{ display:none !important; }
 
-  /* 4) حل مشاكل الجداول/الـ overflow اللي بتطلع الصفحة فاضية */
-  .tableWrap,
-  .tableScroll,
-  .scrollX,
-  .scrollY{
-    overflow:visible !important;
-    max-height:none !important;
+  /* أحيانًا في معاينة الـ PDF بيكون فيه عنوان فوق الكارت */
+  .previewHead{ display:none !important; }
+
+  .printHeader{
+    border-bottom: 1px solid rgba(0,0,0,.12) !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 10px !important;
   }
-  table{ width:100% !important; min-width:0 !important; }
-  thead{ display:table-header-group; }
-  tfoot{ display:table-footer-group; }
-  tr, td, th{ break-inside:avoid; page-break-inside:avoid; }
-
-  /* 5) الفوتر + QR: بدون تراكب ولا Page Break إجباري */
-  .footer2,
-  .qrFooter{
-    position:static !important;
-    left:auto !important;
-    right:auto !important;
-    bottom:auto !important;
-    transform:none !important;
-    break-before:auto !important;
-    page-break-before:auto !important;
-    break-after:auto !important;
-    page-break-after:auto !important;
-    break-inside:avoid !important;
-    page-break-inside:avoid !important;
-    text-align:center !important;
-    background:transparent !important;
+  .printHeader, .printHeader *{
     color:#000 !important;
   }
 
-  /* مسافة بسيطة قبل الفوتر */
-  .footer2{ margin:12mm 0 4mm !important; padding:0 !important; border:0 !important; }
-  .qrFooter{ margin:0 0 6mm !important; padding:0 !important; }
-  .qrFooter img{ display:inline-block !important; max-width:120px !important; height:auto !important; }
+  /* ✅ جداول */
+  table{ page-break-inside:auto; }
+  tr{ page-break-inside:avoid; page-break-after:auto; }
+  thead{ display:table-header-group; }
+  tfoot{ display:table-footer-group; }
 
-  /* 6) لو في printCard (معاينة PDF) نخليه هو البلوك الرئيسي */
-  .printCard{ break-inside:avoid; page-break-inside:avoid; }
-  #printHeader{ display:flex !important; }
+  /* ✅ امنع القص الغريب داخل الكروت */
+  .card, .panel, .box{
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ✅ توسعة المحتوى للطباعة */
+  .container, .wrap, .page, main{
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* ✅ الفوتر + QR: تحت خالص من غير تكرار/تراكب */
+  .footer2,
+  .qrFooter{
+    position: static !important;
+    inset: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  .footer2{
+    margin-top: 14mm !important;
+    padding-top: 6mm !important;
+    border-top: 1px solid rgba(0,0,0,.12) !important;
+  }
+
+  .qrFooter{
+    margin-top: 4mm !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .qrFooter img{
+    max-width: 40mm !important;
+    max-height: 40mm !important;
+    height: auto !important;
+  }
 }
