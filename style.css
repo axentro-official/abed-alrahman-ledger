@@ -495,69 +495,6 @@ html.authed #pinGate{ display:none !important; }
 .miniTable td.num{text-align:left}
 .miniMuted{color:var(--muted); font-size:12px; margin-top:8px}
 
-
-/* =========================================================
-   ✅ Loading Overlay
-   ========================================================= */
-.loadingOverlay{
-  position:fixed;
-  inset:0;
-  z-index:100000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background: rgba(3,6,18,.55);
-  backdrop-filter: blur(6px);
-}
-.loadingCard{
-  width:min(360px, 92vw);
-  border:1px solid rgba(255,255,255,.14);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
-  box-shadow: 0 18px 60px rgba(0,0,0,.55);
-  padding:18px 16px;
-  text-align:center;
-}
-.spinner{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  border:3px solid rgba(255,255,255,.18);
-  border-top-color: rgba(0,188,212,.95);
-  margin: 0 auto 10px;
-  animation: spin .9s linear infinite;
-}
-.loadingText{
-  font-weight:900;
-  margin-top:6px;
-}
-.loadingSub{
-  margin-top:6px;
-  color: rgba(169,183,208,.92);
-  font-size:12px;
-}
-@keyframes spin{ to{ transform: rotate(360deg); } }
-
-
-/* =========================================================
-   ✅ Print Header Bar (يظهر في الطباعة فقط)
-   ========================================================= */
-.printHeaderBar{
-  display:none;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border:1px solid var(--stroke);
-  border-radius: 14px;
-  background: rgba(255,255,255,.04);
-}
-.printHeaderBar .phShop{ font-weight:900; font-size:16px; }
-.printHeaderBar .phAdmin{ color: var(--muted); font-size:12px; margin-top:4px; }
-.printHeaderBar .phTitle{ font-weight:900; font-size:14px; }
-.printHeaderBar .phMeta{ color: var(--muted); font-size:12px; margin-top:4px; }
-
 /* =========================================================
    ✅ PRINT MODE (Save as PDF) — محسّن A4
    ✅ المطلوب: الفوتر + QR يظهروا في الطباعة
@@ -579,13 +516,6 @@ html.authed #pinGate{ display:none !important; }
     line-height: 1.35 !important;
     direction: rtl !important;
   }
-
-  /* ✅ أظهر هيدر الطباعة + اطبع الصفحة الحالية فقط */
-  #printHeader{ display:flex !important; }
-  #loadingOverlay{ display:none !important; }
-
-  #appRoot .page{ display:none !important; }
-  #appRoot .page.printActive{ display:block !important; }
 
   /* ✅ إخفاء عناصر التحكم فقط */
   .topbar,
@@ -692,6 +622,63 @@ html.authed #pinGate{ display:none !important; }
     background: #fff !important;
     border-radius: 6mm !important;
   }
+
+  /* ✅ FIX: اجعل النص واضح (أسود) + الغِ الشفافية/البهتان */
+  *, *::before, *::after{
+    color:#000 !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+    filter: none !important;
+  }
+  .muted, .muted2, .miniMuted, .help, .sub, .phMeta{
+    color:#000 !important;
+    opacity:1 !important;
+  }
+
+  /* ✅ FIX: هيدر الطباعة ثابت أعلى كل صفحة */
+  #printHeader{
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background: #fff !important;
+    padding: 8mm 12mm 6mm !important;
+    margin: 0 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+  body{
+    padding-top: 28mm !important; /* مساحة للهيدر الثابت */
+  }
+
+  /* ✅ FIX: عناوين الجداول (منع الخلفية الكحلي) */
+  .table thead th,
+  .table th{
+    background: #f1f5f9 !important;
+    color: #000 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+  .table td{
+    color:#000 !important;
+  }
+
+  /* ✅ تحسين شارة النوع في الطباعة */
+  .badge{
+    background: #e2e8f0 !important;
+    color:#000 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  /* ✅ منع الفوتر/الـ QR من النزول في صفحة لوحده قدر الإمكان */
+  .footer2, .qrFooter{
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+  .footer2{ margin-top: 6mm !important; padding-top: 6mm !important; }
+  .qrFooter{ padding-top: 3mm !important; }
+
 }
 
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
@@ -818,56 +805,47 @@ html.authed #pinGate{ display:none !important; }
   }
 }
 
-
-
-/* =========================================================
-   ✅ Overlay Compatibility Patch
-   - يضمن ظهور الـ Overlay سواء كان بـ id أو class
-   ========================================================= */
-#loadingOverlay{
+/* =========================
+   ✅ Loading Overlay (Refresh)
+   ========================= */
+#loadingOverlay.loading-overlay{
   position: fixed;
   inset: 0;
-  z-index: 100000;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(3,6,18,.55);
-  backdrop-filter: blur(6px);
+  padding: 16px;
+  background: rgba(5, 10, 20, 0.55);
+  backdrop-filter: blur(4px);
 }
-
-/* دعم لو الـ HTML فيه class="loadingOverlay" (زي ما هو) */
-#loadingOverlay.loadingOverlay{}
-
-/* مكونات الكارت داخل الـ overlay (لو اتبعت structure القديم) */
-#loadingOverlay .loadingCard{
-  width:min(360px, 92vw);
-  border:1px solid rgba(255,255,255,.14);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
-  box-shadow: 0 18px 60px rgba(0,0,0,.55);
-  padding:18px 16px;
-  text-align:center;
+#loadingOverlay .loader-box{
+  background: var(--card, #0f1a2e);
+  color: var(--text, #e7eefc);
+  border: 1px solid var(--stroke, rgba(255,255,255,.10));
+  box-shadow: var(--shadow, 0 18px 50px rgba(0,0,0,.45));
+  border-radius: 14px;
+  padding: 18px 20px;
+  text-align: center;
+  min-width: 220px;
 }
 #loadingOverlay .spinner{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  border:3px solid rgba(255,255,255,.18);
-  border-top-color: rgba(0,188,212,.95);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(77,163,255,1);
+  animation: ax_spin .9s linear infinite;
   margin: 0 auto 10px;
-  animation: spin .9s linear infinite;
 }
-#loadingOverlay .loadingText{
-  font-weight:900;
-  margin-top:6px;
+#loadingOverlay .loader-text{
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.35;
 }
-#loadingOverlay .loadingSub{
-  margin-top:6px;
-  color: rgba(169,183,208,.92);
-  font-size:12px;
-}
+@keyframes ax_spin{ to{ transform: rotate(360deg); } }
 
-/* تأكيد إخفاء الـ overlay أثناء الطباعة */
+/* لا نطبع الـ overlay */
 @media print{
   #loadingOverlay{ display:none !important; }
 }
