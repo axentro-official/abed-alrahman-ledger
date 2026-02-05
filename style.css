@@ -563,6 +563,8 @@ html.authed #pinGate{ display:none !important; }
    ✅ المطلوب: الفوتر + QR يظهروا في الطباعة
    ========================================================= */
 @media print{
+  .printHeaderBar{ display:none !important; }
+
   @page{ size: A4; margin: 12mm; }
 
   *{
@@ -584,8 +586,8 @@ html.authed #pinGate{ display:none !important; }
   #printHeader{ display:flex !important; }
   #loadingOverlay{ display:none !important; }
 
-  #appRoot .page{ display:none !important; }
-  #appRoot .page.printActive{ display:block !important; }
+  #appRoot .page{ display:block !important; }
+  #appRoot .page[hidden]{ display:none !important; }
 
   /* ✅ إخفاء عناصر التحكم فقط */
   .topbar,
@@ -691,6 +693,26 @@ html.authed #pinGate{ display:none !important; }
     border: 1px solid #e5e7eb !important;
     background: #fff !important;
     border-radius: 6mm !important;
+  }
+
+  /* ✅ Ensure footer + QR appear once (no fixed repeat) */
+  .footer2, .qrFooter{
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .footer2{ margin: 12mm 0 4mm !important; }
+  .qrFooter{ margin: 0 0 0 !important; }
+  .footer2 + .qrFooter{ margin-top: 4mm !important; }
+
+  /* ✅ Prevent accidental blank pages */
+  .footer2, .qrFooter{
+    page-break-before: auto !important;
+    break-before: auto !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 }
 
@@ -893,313 +915,3 @@ html.authed #pinGate{ display:none !important; }
 
 
 
-/* =========================
-   ✅ PRINT OVERRIDES (Final)
-   - Force black text
-   - Fix dark table headers
-   - Footer + QR as fixed (no extra pages)
-   - Optional top header (shop + page title)
-   ========================= */
-@media print{
-  html,body{
-    background:#fff !important;
-    color:#000 !important;
-    -webkit-print-color-adjust:exact;
-    print-color-adjust:exact;
-  }
-  *{
-    color:#000 !important;
-    text-shadow:none !important;
-    box-shadow:none !important;
-    filter:none !important;
-    opacity:1 !important;
-  }
-  .muted{ color:#333 !important; }
-  a{ color:#000 !important; text-decoration:none !important; }
-
-  /* Hide navigation / actions / overlays */
-  .topbar,.navBar,.navBtn,.btn,#btnPrint,#btnLogout,
-  #globalBanner,#refreshOverlay{
-    display:none !important;
-  }
-
-  [hidden]{ display:none !important; }
-
-  /* Layout */
-  #appRoot{
-    background:#fff !important;
-    padding-top:22mm !important;
-    padding-bottom:42mm !important;
-  }
-  section,.card,.card2,.panel,.box,.modal,.modalContent{
-    background:#fff !important;
-    border:1px solid #e3e6ea !important;
-    border-radius:10px !important;
-  }
-
-  /* Form controls */
-  input,select,textarea{
-    background:#fff !important;
-    color:#000 !important;
-    border:1px solid #cfd6de !important;
-  }
-  option{ color:#000 !important; }
-
-  /* Tables */
-  table{ width:100% !important; border-collapse:collapse !important; }
-  th,td{ border:1px solid #d9dee5 !important; }
-  thead th{
-    background:#f2f4f7 !important;
-    color:#000 !important;
-  }
-  .badge{
-    background:#f2f4f7 !important;
-    color:#000 !important;
-    border:1px solid #d9dee5 !important;
-  }
-
-  /* Footer & QR fixed so they don't create extra pages */
-  .footer2{
-    position:fixed !important;
-    left:0 !important;
-    right:0 !important;
-    bottom:16mm !important;
-    background:transparent !important;
-    padding:0 !important;
-    margin:0 !important;
-    border:none !important;
-    text-align:center !important;
-    font-size:10pt !important;
-  }
-  .qrFooter{
-    position:fixed !important;
-    left:0 !important;
-    right:0 !important;
-    bottom:6mm !important;
-    background:transparent !important;
-    padding:0 !important;
-    margin:0 !important;
-    border:none !important;
-    display:flex !important;
-    justify-content:center !important;
-  }
-  .qrFooter img,.qrWrap img{
-    width:28mm !important;
-    height:28mm !important;
-  }
-
-  /* Optional Print Header (set body[data-print-title] from JS for page title) */
-  body:before{
-    content:"سوبر ماركت أولاد يحيى";
-    position:fixed;
-    top:8mm;
-    right:12mm;
-    font-weight:800;
-    font-size:14pt;
-  }
-  body:after{
-    content: attr(data-print-title);
-    position:fixed;
-    top:10mm;
-    left:12mm;
-    font-weight:800;
-    font-size:12pt;
-  }
-
-  /* Prevent strange breaks */
-  .card,table,thead,tbody,tr,td,th{ break-inside:avoid-page; page-break-inside:avoid; }
-}
-
-
-/* =========================================================
-   ✅ Print Fix v3: Prevent duplicate fixed footer/QR & overlap
-   - Do NOT use position:fixed for footer elements in print (it repeats each page on Android)
-   - Keep QR + footer in normal document flow at the end, and avoid page breaks inside them
-   ========================================================= */
-@media print{
-  /* Override any previous fixed positioning */
-  .footer2,
-  .qrFooter{
-    position: static !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid-page !important;
-  }
-
-  /* Keep them together: if a break happens, move BOTH to next page */
-  .qrFooter{ 
-    margin-top: 10mm !important;
-    margin-bottom: 4mm !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    gap: 8mm !important;
-  }
-  .qrFooter .qrWrap{
-    display: grid !important;
-    place-items: center !important;
-  }
-  .qrFooter img,
-  .qrFooter canvas{
-    max-width: 32mm !important;
-    max-height: 32mm !important;
-    width: 32mm !important;
-    height: 32mm !important;
-  }
-
-  .footer2{
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    border-top: none !important;
-    text-align: center !important;
-    font-size: 10pt !important;
-    color: #111 !important;
-  }
-
-  /* Avoid leaving huge blank areas caused by min-heights from screen layout */
-  .card, .panel, .container, .wrap, .content, .page, main{
-    min-height: auto !important;
-    height: auto !important;
-  }
-
-  /* Make sure the global footer area isn't forced onto a new blank page */
-  footer{
-    page-break-inside: avoid !important;
-    break-inside: avoid-page !important;
-  }
-}
-
-
-
-/* =========================
-   ✅ Print Override v4 (Fix duplication + footer/QR overlap)
-   - Print ONLY the active printCard (not .hidden)
-   - Unified header layout
-   - Footer + QR appear ONCE (not fixed / not repeated)
-   ========================= */
-@media print {
-  @page { size: A4; margin: 12mm; }
-
-  html, body {
-    background: #fff !important;
-  }
-
-  body {
-    margin: 0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Hide everything by default */
-  body * {
-    visibility: hidden !important;
-  }
-
-  /* Only show the active print card */
-  .printCard.hidden { display: none !important; }
-  .printCard:not(.hidden),
-  .printCard:not(.hidden) * {
-    visibility: visible !important;
-  }
-
-  /* Also show footer + QR once at the very end */
-  footer.footer2,
-  footer.footer2 *,
-  .qrFooter,
-  .qrFooter * {
-    visibility: visible !important;
-  }
-
-  /* Layout the active card */
-  .printCard:not(.hidden) {
-    position: relative !important;
-    inset: auto !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    background: #fff !important;
-  }
-
-  /* Unified header: Right = Company, Left = page meta/status */
-  .printHeader {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: flex-start !important;
-    gap: 12mm !important;
-    padding: 0 0 6mm 0 !important;
-    margin: 0 0 6mm 0 !important;
-    border-bottom: 1px solid #e6e6e6 !important;
-    direction: rtl !important; /* company on the right */
-  }
-  .printHeader > div:first-child {
-    text-align: right !important;
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-  }
-  .printHeader > div:last-child {
-    text-align: left !important;
-    flex: 0 0 auto !important;
-    direction: ltr !important;
-    white-space: nowrap !important;
-  }
-  .printHeader h3 { margin: 0 0 2mm 0 !important; }
-  .printHeader .miniMuted { margin-top: 1mm !important; }
-
-  /* Content spacing */
-  .printCard .printBody,
-  .printCard .printContent,
-  .printCard .cardBody {
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* Prevent awkward splits */
-  table { page-break-inside: auto; }
-  thead { display: table-header-group; }
-  tfoot { display: table-footer-group; }
-  tr, img, svg, canvas, .card, .section {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  /* Footer + QR: NOT fixed (so it won't repeat), and won't overlap */
-  footer.footer2 {
-    position: static !important;
-    width: 100% !important;
-    text-align: center !important;
-    margin-top: 10mm !important;
-    padding-top: 6mm !important;
-    border-top: 1px solid #e6e6e6 !important;
-  }
-
-  .qrFooter {
-    position: static !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    margin-top: 6mm !important;
-    margin-bottom: 0 !important;
-  }
-
-  .qrFooter img,
-  .qrFooter canvas {
-    width: 38mm !important;
-    height: 38mm !important;
-    max-width: 38mm !important;
-    max-height: 38mm !important;
-    object-fit: contain !important;
-  }
-
-  /* If footer+QR should be alone on the last page, uncomment:
-  footer.footer2 { break-before: page !important; }
-  */
-}
