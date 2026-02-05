@@ -37,6 +37,14 @@ const fmt = (n) => {
 const uid = () => `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
+// ✅ تطبيع التاريخ القادم من الشيت (قد يكون timestamp)
+function normalizeISODate(v){
+  if(v == null) return "";
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : s;
+}
+
 function typeLabel(t){
   return ({
     expense: "مصروف",
@@ -787,6 +795,7 @@ async function renderEntriesTable(entriesView){
   if(!tbody) return;
 
   const myToken = ++__entriesRenderToken;
+  window.__entriesRenderToken = myToken;
 
   const sorted = [...entriesView].sort((a,b)=>
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
@@ -845,6 +854,7 @@ async function renderPaymentsTable(payments, entries){
   if(!tbody) return;
 
   const myToken = ++__paymentsRenderToken;
+  window.__paymentsRenderToken = myToken;
 
   const q = (el("payQ")?.value || "").trim().toLowerCase();
 
@@ -1269,8 +1279,9 @@ function renderTrash(){
 
 /* -------------------- Reports -------------------- */
 function toDateNum(iso){
-  if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return NaN;
-  return Number(iso.replaceAll("-", ""));
+  const s = normalizeISODate(iso);
+  if(!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return NaN;
+  return Number(s.replaceAll("-", ""));
 }
 function clampDateRange(fromISO, toISO){
   const f = toDateNum(fromISO);
@@ -1447,6 +1458,11 @@ async function refresh(forceNetwork = false){
     STATE.entries = Array.isArray(local.entries) ? local.entries : [];
     STATE.payments = Array.isArray(local.payments) ? local.payments : [];
     STATE.trash = Array.isArray(local.trash) ? local.trash : [];
+
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
+
     await renderFromState();
 
     // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
@@ -1465,6 +1481,11 @@ async function refresh(forceNetwork = false){
     STATE.entries = Array.isArray(all.entries) ? all.entries : [];
     STATE.payments = payments;
     STATE.trash = Array.isArray(all.trash) ? all.trash : [];
+
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
+
 
     await renderFromState();
     hideGlobalError();
