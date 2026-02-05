@@ -756,22 +756,24 @@ function renderKPIs(entriesView, payments){
 /* -------------------- Filters -------------------- */
 function applyEntryFilters(entriesView){
   const q  = (el("q")?.value || "").trim().toLowerCase();
-  const ft = el("filterType")?.value || "";
-  const fo = el("filterOpen")?.value || "";
+  const ft = (el("filterType")?.value || "").trim();
+  const fo = (el("filterOpen")?.value || "").trim();
 
   return entriesView.filter(e=>{
     const hitQ = !q || (
       (e.party || "").toLowerCase().includes(q) ||
       (e.desc || "").toLowerCase().includes(q) ||
-      (e.notes || "").toLowerCase().includes(q)
+      (e.notes || "").toLowerCase().includes(q) ||
+      (e.category || "").toLowerCase().includes(q)
     );
 
     const hitT = !ft || e.type === ft;
 
+    // ✅ فلتر "عليه باقي/مقفول" منطقي للعمليات المستحقة فقط (مش للمصروف)
     const hitO =
       !fo ||
-      (fo === "open" && e.remaining > 0) ||
-      (fo === "closed" && e.remaining === 0);
+      (fo === "open"   && e.type !== "expense" && Number(e.remaining) > 0) ||
+      (fo === "closed" && e.type !== "expense" && Number(e.remaining) === 0);
 
     return hitQ && hitT && hitO;
   });
@@ -789,6 +791,11 @@ async function renderEntriesTable(entriesView){
   const sorted = [...entriesView].sort((a,b)=>
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
   );
+
+  if(sorted.length === 0){
+    tbody.innerHTML = `<tr><td colspan="9">لا توجد عمليات مطابقة.</td></tr>`;
+    return;
+  }
 
   await renderChunked(
     tbody,
@@ -855,6 +862,11 @@ async function renderPaymentsTable(payments, entries){
   const sorted = [...filtered].sort((a,b)=>
     (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
   );
+
+  if(sorted.length === 0){
+    tbody.innerHTML = `<tr><td colspan="6">لا توجد مدفوعات لعرضها.</td></tr>`;
+    return;
+  }
 
   await renderChunked(
     tbody,
@@ -1414,6 +1426,12 @@ function renderReports(){
   }
 }
 
+
+/* -------------------- Loading State (خفيف) -------------------- */
+function setLoading(isLoading){
+  document.documentElement.classList.toggle("isLoading", !!isLoading);
+}
+
 /* -------------------- Refresh (تحميل من الشيت) -------------------- */
 let __refreshLock = false;
 async function refresh(forceNetwork = false){
@@ -1422,13 +1440,19 @@ async function refresh(forceNetwork = false){
 
   try{
     hideGlobalError();
+    setLoading(true);
 
+    // ✅ دايمًا اعرض المحلي الأول (يمنع اختفاء الأرقام بعد Refresh)
+    const local = await STORE.local.getAll();
+    STATE.entries = Array.isArray(local.entries) ? local.entries : [];
+    STATE.payments = Array.isArray(local.payments) ? local.payments : [];
+    STATE.trash = Array.isArray(local.trash) ? local.trash : [];
+    await renderFromState();
+
+    // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
     if(!forceNetwork){
-      const local = await STORE.local.getAll();
-      STATE.entries = Array.isArray(local.entries) ? local.entries : [];
-      STATE.payments = Array.isArray(local.payments) ? local.payments : [];
-      STATE.trash = Array.isArray(local.trash) ? local.trash : [];
-      await renderFromState();
+      setLoading(false);
+      return;
     }
 
     const all = await STORE.getAll();
@@ -1453,6 +1477,7 @@ async function refresh(forceNetwork = false){
         : "حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اضغط إعادة المحاولة.";
     showGlobalError(msg);
   }finally{
+    setLoading(false);
     __refreshLock = false;
   }
 }
