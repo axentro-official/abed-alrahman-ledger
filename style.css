@@ -622,7 +622,42 @@ html.authed #pinGate{ display:none !important; }
     background: #fff !important;
     border-radius: 6mm !important;
   }
+
+
+  /* ✅ Print Fixes (Records & Reports) */
+  /* Force any JS/inline max-height/height on scroll containers to print full content */
+  .tableWrap,
+  .card .tableWrap,
+  .card2 .tableWrap,
+  #recordsTableWrap,
+  #reportsTableWrap{
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure tables paginate correctly and headers repeat */
+  table{ page-break-inside:auto; }
+  thead{ display: table-header-group; }
+  tfoot{ display: table-footer-group; }
+  tr{ page-break-inside: avoid; page-break-after: auto; }
+
+  /* Avoid accidental hiding of report/records sections */
+  #page-records,
+  #page-reports,
+  #page-records * ,
+  #page-reports *{
+    visibility: visible !important;
+  }
+
+  /* If any container uses transforms (can break print layout), reset */
+  .page, section, main, .app, #app{
+    transform: none !important;
+  }
+
+
 }
+
 
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
 .ledger select{
