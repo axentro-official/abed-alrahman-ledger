@@ -1394,7 +1394,7 @@ function renderReports(){
   if(repPaysTbody){
     repPaysTbody.innerHTML = "";
     const sortedPays = [...pays].sort((a,b)=>
-      (b.date || "").localeCompare(b.date || "") || (b.createdAt - a.createdAt)
+      (b.date || "").localeCompare(a.date || "") || (b.createdAt - a.createdAt)
     );
 
     if(sortedPays.length === 0){
@@ -1491,6 +1491,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       preparePrintForCurrentPage();
       window.print();
     });
+
+    // ✅ Preview pages buttons (Back / Print)
+    el("btnBackFromEntryPreview")?.addEventListener("click", ()=> showPage("records"));
+    el("btnPrintEntry")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
+    el("btnBackFromLedgerPreview")?.addEventListener("click", ()=> showPage("ledger"));
+    el("btnPrintLedger")?.addEventListener("click", ()=>{ preparePrintForCurrentPage(); window.print(); });
 
     // ✅ Add Entry
     el("entryForm")?.addEventListener("submit", async (ev)=>{
