@@ -1075,3 +1075,131 @@ html.authed #pinGate{ display:none !important; }
   }
 }
 
+
+
+/* =========================
+   ✅ Print Override v4 (Fix duplication + footer/QR overlap)
+   - Print ONLY the active printCard (not .hidden)
+   - Unified header layout
+   - Footer + QR appear ONCE (not fixed / not repeated)
+   ========================= */
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  html, body {
+    background: #fff !important;
+  }
+
+  body {
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide everything by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Only show the active print card */
+  .printCard.hidden { display: none !important; }
+  .printCard:not(.hidden),
+  .printCard:not(.hidden) * {
+    visibility: visible !important;
+  }
+
+  /* Also show footer + QR once at the very end */
+  footer.footer2,
+  footer.footer2 *,
+  .qrFooter,
+  .qrFooter * {
+    visibility: visible !important;
+  }
+
+  /* Layout the active card */
+  .printCard:not(.hidden) {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  /* Unified header: Right = Company, Left = page meta/status */
+  .printHeader {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    gap: 12mm !important;
+    padding: 0 0 6mm 0 !important;
+    margin: 0 0 6mm 0 !important;
+    border-bottom: 1px solid #e6e6e6 !important;
+    direction: rtl !important; /* company on the right */
+  }
+  .printHeader > div:first-child {
+    text-align: right !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+  .printHeader > div:last-child {
+    text-align: left !important;
+    flex: 0 0 auto !important;
+    direction: ltr !important;
+    white-space: nowrap !important;
+  }
+  .printHeader h3 { margin: 0 0 2mm 0 !important; }
+  .printHeader .miniMuted { margin-top: 1mm !important; }
+
+  /* Content spacing */
+  .printCard .printBody,
+  .printCard .printContent,
+  .printCard .cardBody {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Prevent awkward splits */
+  table { page-break-inside: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr, img, svg, canvas, .card, .section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Footer + QR: NOT fixed (so it won't repeat), and won't overlap */
+  footer.footer2 {
+    position: static !important;
+    width: 100% !important;
+    text-align: center !important;
+    margin-top: 10mm !important;
+    padding-top: 6mm !important;
+    border-top: 1px solid #e6e6e6 !important;
+  }
+
+  .qrFooter {
+    position: static !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin-top: 6mm !important;
+    margin-bottom: 0 !important;
+  }
+
+  .qrFooter img,
+  .qrFooter canvas {
+    width: 38mm !important;
+    height: 38mm !important;
+    max-width: 38mm !important;
+    max-height: 38mm !important;
+    object-fit: contain !important;
+  }
+
+  /* If footer+QR should be alone on the last page, uncomment:
+  footer.footer2 { break-before: page !important; }
+  */
+}
