@@ -890,3 +890,122 @@ html.authed #pinGate{ display:none !important; }
 @media print{
   #loadingOverlay, .loadingOverlay{ display:none !important; }
 }
+
+
+
+/* =========================
+   ✅ PRINT OVERRIDES (Final)
+   - Force black text
+   - Fix dark table headers
+   - Footer + QR as fixed (no extra pages)
+   - Optional top header (shop + page title)
+   ========================= */
+@media print{
+  html,body{
+    background:#fff !important;
+    color:#000 !important;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  *{
+    color:#000 !important;
+    text-shadow:none !important;
+    box-shadow:none !important;
+    filter:none !important;
+    opacity:1 !important;
+  }
+  .muted{ color:#333 !important; }
+  a{ color:#000 !important; text-decoration:none !important; }
+
+  /* Hide navigation / actions / overlays */
+  .topbar,.navBar,.navBtn,.btn,#btnPrint,#btnLogout,
+  #globalBanner,#refreshOverlay{
+    display:none !important;
+  }
+
+  [hidden]{ display:none !important; }
+
+  /* Layout */
+  #appRoot{
+    background:#fff !important;
+    padding-top:22mm !important;
+    padding-bottom:42mm !important;
+  }
+  section,.card,.card2,.panel,.box,.modal,.modalContent{
+    background:#fff !important;
+    border:1px solid #e3e6ea !important;
+    border-radius:10px !important;
+  }
+
+  /* Form controls */
+  input,select,textarea{
+    background:#fff !important;
+    color:#000 !important;
+    border:1px solid #cfd6de !important;
+  }
+  option{ color:#000 !important; }
+
+  /* Tables */
+  table{ width:100% !important; border-collapse:collapse !important; }
+  th,td{ border:1px solid #d9dee5 !important; }
+  thead th{
+    background:#f2f4f7 !important;
+    color:#000 !important;
+  }
+  .badge{
+    background:#f2f4f7 !important;
+    color:#000 !important;
+    border:1px solid #d9dee5 !important;
+  }
+
+  /* Footer & QR fixed so they don't create extra pages */
+  .footer2{
+    position:fixed !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:16mm !important;
+    background:transparent !important;
+    padding:0 !important;
+    margin:0 !important;
+    border:none !important;
+    text-align:center !important;
+    font-size:10pt !important;
+  }
+  .qrFooter{
+    position:fixed !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:6mm !important;
+    background:transparent !important;
+    padding:0 !important;
+    margin:0 !important;
+    border:none !important;
+    display:flex !important;
+    justify-content:center !important;
+  }
+  .qrFooter img,.qrWrap img{
+    width:28mm !important;
+    height:28mm !important;
+  }
+
+  /* Optional Print Header (set body[data-print-title] from JS for page title) */
+  body:before{
+    content:"سوبر ماركت أولاد يحيى";
+    position:fixed;
+    top:8mm;
+    right:12mm;
+    font-weight:800;
+    font-size:14pt;
+  }
+  body:after{
+    content: attr(data-print-title);
+    position:fixed;
+    top:10mm;
+    left:12mm;
+    font-weight:800;
+    font-size:12pt;
+  }
+
+  /* Prevent strange breaks */
+  .card,table,thead,tbody,tr,td,th{ break-inside:avoid-page; page-break-inside:avoid; }
+}
