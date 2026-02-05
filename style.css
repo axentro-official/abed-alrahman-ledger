@@ -1009,3 +1009,69 @@ html.authed #pinGate{ display:none !important; }
   /* Prevent strange breaks */
   .card,table,thead,tbody,tr,td,th{ break-inside:avoid-page; page-break-inside:avoid; }
 }
+
+
+/* =========================================================
+   ✅ Print Fix v3: Prevent duplicate fixed footer/QR & overlap
+   - Do NOT use position:fixed for footer elements in print (it repeats each page on Android)
+   - Keep QR + footer in normal document flow at the end, and avoid page breaks inside them
+   ========================================================= */
+@media print{
+  /* Override any previous fixed positioning */
+  .footer2,
+  .qrFooter{
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+
+  /* Keep them together: if a break happens, move BOTH to next page */
+  .qrFooter{ 
+    margin-top: 10mm !important;
+    margin-bottom: 4mm !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8mm !important;
+  }
+  .qrFooter .qrWrap{
+    display: grid !important;
+    place-items: center !important;
+  }
+  .qrFooter img,
+  .qrFooter canvas{
+    max-width: 32mm !important;
+    max-height: 32mm !important;
+    width: 32mm !important;
+    height: 32mm !important;
+  }
+
+  .footer2{
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+    text-align: center !important;
+    font-size: 10pt !important;
+    color: #111 !important;
+  }
+
+  /* Avoid leaving huge blank areas caused by min-heights from screen layout */
+  .card, .panel, .container, .wrap, .content, .page, main{
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* Make sure the global footer area isn't forced onto a new blank page */
+  footer{
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+}
+
