@@ -495,76 +495,11 @@ html.authed #pinGate{ display:none !important; }
 .miniTable td.num{text-align:left}
 .miniMuted{color:var(--muted); font-size:12px; margin-top:8px}
 
-
-/* =========================================================
-   ✅ Loading Overlay
-   ========================================================= */
-.loadingOverlay{
-  position:fixed;
-  inset:0;
-  z-index:100000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background: rgba(3,6,18,.55);
-  backdrop-filter: blur(6px);
-}
-.loadingCard{
-  width:min(360px, 92vw);
-  border:1px solid rgba(255,255,255,.14);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(15,26,46,.96), rgba(12,22,41,.96));
-  box-shadow: 0 18px 60px rgba(0,0,0,.55);
-  padding:18px 16px;
-  text-align:center;
-}
-.spinner{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  border:3px solid rgba(255,255,255,.18);
-  border-top-color: rgba(0,188,212,.95);
-  margin: 0 auto 10px;
-  animation: spin .9s linear infinite;
-}
-.loadingText{
-  font-weight:900;
-  margin-top:6px;
-}
-.loadingSub{
-  margin-top:6px;
-  color: rgba(169,183,208,.92);
-  font-size:12px;
-}
-@keyframes spin{ to{ transform: rotate(360deg); } }
-
-
-/* =========================================================
-   ✅ Print Header Bar (يظهر في الطباعة فقط)
-   ========================================================= */
-.printHeaderBar{
-  display:none;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border:1px solid var(--stroke);
-  border-radius: 14px;
-  background: rgba(255,255,255,.04);
-}
-.printHeaderBar .phShop{ font-weight:900; font-size:16px; }
-.printHeaderBar .phAdmin{ color: var(--muted); font-size:12px; margin-top:4px; }
-.printHeaderBar .phTitle{ font-weight:900; font-size:14px; }
-.printHeaderBar .phMeta{ color: var(--muted); font-size:12px; margin-top:4px; }
-
 /* =========================================================
    ✅ PRINT MODE (Save as PDF) — محسّن A4
    ✅ المطلوب: الفوتر + QR يظهروا في الطباعة
    ========================================================= */
 @media print{
-  .printHeaderBar{ display:none !important; }
-
   @page{ size: A4; margin: 12mm; }
 
   *{
@@ -581,13 +516,6 @@ html.authed #pinGate{ display:none !important; }
     line-height: 1.35 !important;
     direction: rtl !important;
   }
-
-  /* ✅ أظهر هيدر الطباعة + اطبع الصفحة الحالية فقط */
-  #printHeader{ display:flex !important; }
-  #loadingOverlay{ display:none !important; }
-
-  #appRoot .page{ display:block !important; }
-  #appRoot .page[hidden]{ display:none !important; }
 
   /* ✅ إخفاء عناصر التحكم فقط */
   .topbar,
@@ -694,26 +622,86 @@ html.authed #pinGate{ display:none !important; }
     background: #fff !important;
     border-radius: 6mm !important;
   }
+}
 
-  /* ✅ Ensure footer + QR appear once (no fixed repeat) */
-  .footer2, .qrFooter{
+/* =========================
+   ✅ Print Fixes (v3)
+   الهدف: منع تكرار اسم المتجر/العناوين + منع صفحات فاضية + ترتيب الفوتر والـ QR
+   ========================= */
+@media print{
+  /* 1) امنع أي Overlay / Gate من الظهور (كان بيطبع "سوبر ماركت..." لوحدها) */
+  .gateWrap,
+  .gateOverlay,
+  .gateCard,
+  .gateTitle,
+  .gateSub,
+  .toast,
+  .toastWrap,
+  .loadingOverlay,
+  .overlay,
+  .modalBackdrop,
+  .modal{
+    display:none !important;
+  }
+
+  /* 2) اطبع المحتوى الفعلي (حل مشكلة زر الطباعة الرئيسي اللي بيطلع صفحة فاضية) */
+  body,
+  .app,
+  .main,
+  .container,
+  .pages,
+  .page{
+    display:block !important;
+  }
+  .page[hidden]{ display:none !important; }
+
+  /* 3) خلّي العناصر اللي بتكون Scrollable تظهر كاملة في الطباعة */
+  .tableWrap,
+  .tableScroll,
+  .scrollX,
+  .scrollY{
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* 4) امنع تكرار/تداخل العناوين: خلي عنوان المتجر يطلع مرة واحدة فقط */
+  /* - العنوان اللي فوق خالص كان بيجي من الـ topbar (وإحياناً الـ gate) */
+  .topbar,
+  .tabs,
+  .nav,
+  .actionsBar,
+  .printBtn,
+  .btnPrint,
+  .noPrint{ display:none !important; }
+
+  /* - لو في عنوان صفحة ظاهر مرتين، خليه يظهر مرة واحدة (اللي جوه printCard فقط) */
+  .pageHead{ display:none !important; }
+  .printCard .pageHead{ display:block !important; }
+
+  /* 5) الفوتر + QR: يبقوا آخر الصفحة بدون ما يركبوا على بعض، وبدون صفحة إضافية فاضية */
+  .footer2,
+  .qrFooter{
     position: static !important;
     inset: auto !important;
     transform: none !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  .footer2{ margin: 12mm 0 4mm !important; }
-  .qrFooter{ margin: 0 0 0 !important; }
-  .footer2 + .qrFooter{ margin-top: 4mm !important; }
-
-  /* ✅ Prevent accidental blank pages */
-  .footer2, .qrFooter{
     page-break-before: auto !important;
     break-before: auto !important;
     page-break-after: auto !important;
     break-after: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
+  .footer2{ margin-top: 18px !important; }
+  .qrFooter{ margin-top: 10px !important; }
+  .qrBox{ margin: 0 auto !important; }
+
+  /* 6) منع تكسير الصفوف داخل الجداول قدر الإمكان */
+  table{ page-break-inside:auto; break-inside:auto; }
+  tr{ page-break-inside:avoid; break-inside:avoid; }
+  thead{ display: table-header-group; }
+  tfoot{ display: table-footer-group; }
 }
 
 /* ✅ Ledger mode selector (Customer/Supplier/All) */
@@ -840,78 +828,99 @@ html.authed #pinGate{ display:none !important; }
   }
 }
 
-/* ✅ Refresh Overlay (Centered) */
-#loadingOverlay, .loadingOverlay{
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(6, 10, 20, .55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-#loadingOverlay[hidden], .loadingOverlay[hidden]{
-  display: none !important;
-}
-
-#loadingOverlay .loadingCard,
-.loadingOverlay .loadingCard{
-  width: min(520px, 92vw);
-  background: rgba(15, 26, 46, .92);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 18px;
-  box-shadow: 0 22px 60px rgba(0,0,0,.55);
-  padding: 18px 18px 16px;
-}
-
-#loadingOverlay .loadingRow,
-.loadingOverlay .loadingRow{
-  display:flex;
-  gap: 12px;
-  align-items: center;
-}
-
-#loadingOverlay .loadingSpinner,
-.loadingOverlay .loadingSpinner{
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 3px solid rgba(231,238,252,.25);
-  border-top-color: rgba(231,238,252,.95);
-  animation: spin 0.9s linear infinite;
-  flex: 0 0 auto;
-}
-
-#loadingOverlay .loadingText,
-.loadingOverlay .loadingText{
-  flex:1;
-  min-width: 0;
-}
-
-#loadingOverlay .loadingTitle,
-.loadingOverlay .loadingTitle{
-  font-weight: 900;
-  letter-spacing: .2px;
-  margin: 0 0 2px;
-  color: rgba(231,238,252,.98);
-}
-
-#loadingOverlay .loadingSub,
-.loadingOverlay .loadingSub{
-  margin: 0;
-  color: rgba(169,183,208,.92);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
+/* =========================================================
+   ✅ Print Fix Pack (v3)
+   - يمنع تكرار اسم المتجر بسبب Gate/Overlay
+   - يمنع صفحات فاضية بسبب overflow/hidden أو عناصر مخفية
+   - يثبت الفوتر + QR أسفل المحتوى بدون تراكب ولا تكرار
+   ========================================================= */
 @media print{
-  #loadingOverlay, .loadingOverlay{ display:none !important; }
+  /* خلفية وطباعة نظيفة */
+  html, body{
+    background:#fff !important;
+    color:#000 !important;
+  }
+
+  /* 1) اخفاء أي Gate/Overlay/Toast (كانت بتظهر نصوص لوحدها فوق) */
+  .gateWrap,
+  .gateOverlay,
+  .gateCard,
+  .gateTitle,
+  .gateSub,
+  .toast,
+  .toastWrap,
+  .modal,
+  .modalOverlay,
+  .overlay,
+  .overlayWrap{
+    display:none !important;
+  }
+
+  /* 2) اخفاء الهيدر/الناف/أزرار التحكم (لكن نخلي الـ printCard لو موجود) */
+  .topbar,
+  .tabs,
+  .tabbar,
+  .btn,
+  .btnRow,
+  .noPrint,
+  .hideOnPrint,
+  .actions,
+  .actionBtns,
+  .floatingBtn{
+    display:none !important;
+  }
+
+  /* 3) تأكيد إظهار الصفحات الفعلية وعدم اختفائها */
+  .page,
+  .pageContent,
+  .container,
+  .wrap,
+  main,
+  #app,
+  body{
+    display:block !important;
+    visibility:visible !important;
+  }
+  .page[hidden]{ display:none !important; }
+
+  /* 4) حل مشاكل الجداول/الـ overflow اللي بتطلع الصفحة فاضية */
+  .tableWrap,
+  .tableScroll,
+  .scrollX,
+  .scrollY{
+    overflow:visible !important;
+    max-height:none !important;
+  }
+  table{ width:100% !important; min-width:0 !important; }
+  thead{ display:table-header-group; }
+  tfoot{ display:table-footer-group; }
+  tr, td, th{ break-inside:avoid; page-break-inside:avoid; }
+
+  /* 5) الفوتر + QR: بدون تراكب ولا Page Break إجباري */
+  .footer2,
+  .qrFooter{
+    position:static !important;
+    left:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    transform:none !important;
+    break-before:auto !important;
+    page-break-before:auto !important;
+    break-after:auto !important;
+    page-break-after:auto !important;
+    break-inside:avoid !important;
+    page-break-inside:avoid !important;
+    text-align:center !important;
+    background:transparent !important;
+    color:#000 !important;
+  }
+
+  /* مسافة بسيطة قبل الفوتر */
+  .footer2{ margin:12mm 0 4mm !important; padding:0 !important; border:0 !important; }
+  .qrFooter{ margin:0 0 6mm !important; padding:0 !important; }
+  .qrFooter img{ display:inline-block !important; max-width:120px !important; height:auto !important; }
+
+  /* 6) لو في printCard (معاينة PDF) نخليه هو البلوك الرئيسي */
+  .printCard{ break-inside:avoid; page-break-inside:avoid; }
+  #printHeader{ display:flex !important; }
 }
-
-
-
