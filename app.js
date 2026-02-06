@@ -1,3 +1,14 @@
+
+// ===== Safety: prevent form submit reload if JS partially loaded =====
+(function(){
+  try{
+    const form = document.getElementById('pinForm');
+    if(form){
+      form.addEventListener('submit', (e)=>{ e.preventDefault(); return false; }, {capture:true});
+    }
+  }catch(_e){}
+})();
+
 /* سوبر ماركت أولاد يحيى — دفتر الحسابات
    ✅ PIN ثابت: 1234
    ✅ مدفوعات منفصلة payments[] مرتبطة بكل عملية entryId
@@ -16,7 +27,7 @@ const PIN_CODE = "1234";
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbx24eOde-hcX2Kk-Da6NnTdZSKrcDxrCItFczmSJdA_4QkBQgfd8BJUVwLyARtWJ6dR2w/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
   pin: "1234"
 };
 
@@ -79,56 +90,6 @@ function escapeHtml(str){
     .replaceAll("'", "&#039;");
 }
 
-/* -------------------- ✅ Trash Normalizer (Sheets/Local compatible) -------------------- */
-function normalizeTrashItem(it){
-  if(!it || typeof it !== "object") return null;
-
-  let obj = { ...it };
-
-  // snapshotJson (string) -> parsed object fields
-  const snapStr = obj.snapshotJson || obj.snapshotJSON || obj.snapshot;
-  if(typeof snapStr === "string" && snapStr.trim()){
-    try{
-      const parsed = JSON.parse(snapStr);
-      if(parsed && typeof parsed === "object"){
-        obj = { ...obj, ...parsed };
-      }
-    }catch(_e){}
-  }
-
-  // at: UI expects item.at; Sheets may send deletedAt
-  let at = obj.at ?? obj.deletedAt ?? obj.deleted_at ?? obj.time ?? obj.ts ?? obj.createdAt;
-  if(typeof at === "string" && /^\d+$/.test(at)) at = Number(at);
-  if(!Number.isFinite(Number(at))) at = Date.now();
-  obj.at = Number(at);
-
-  // type: UI expects delete_entry / delete_payment
-  if(!obj.type){
-    const reason = String(obj.reason || "").toLowerCase();
-    const refTbl = String(obj.refTable || "").toLowerCase();
-    if(reason.includes("entry") || reason.includes("transaction") || refTbl.includes("entries") || refTbl.includes("transactions")){
-      obj.type = "delete_entry";
-    }else if(reason.includes("payment") || refTbl.includes("payments")){
-      obj.type = "delete_payment";
-    }else{
-      // fallback
-      obj.type = (obj.entrySnapshot || obj.paymentsSnapshot) ? "delete_entry" : "delete_payment";
-    }
-  }
-
-  // id fallback
-  if(!obj.id) obj.id = obj.logId || obj.refId || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-  return obj;
-}
-function normalizeTrash(list){
-  return (Array.isArray(list) ? list : [])
-    .map(normalizeTrashItem)
-    .filter(Boolean);
-}
-/* ------------------------------------------------------------------------------ */
-
-
 /* ✅ Labels */
 function flowLabel(flow){
   return flow === "in" ? "متحصلات داخلة" : "مدفوعات خارجة";
@@ -140,15 +101,6 @@ function sumPaymentsForEntry(entryId, payments, flow = "all"){
     .filter(p => p.entryId === entryId)
     .filter(p => flow === "all" ? true : (p.flow === flow))
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
-}
-
-/* ✅ استبعاد الصفوف المحذوفة القادمة من الشيت (isDeleted=1) */
-function isRowDeleted(obj){
-  if(!obj || typeof obj !== "object") return false;
-  const v = obj.isDeleted ?? obj.deleted ?? obj.is_deleted ?? obj.IsDeleted ?? obj.ISDELETED;
-  if(v == null) return false;
-  const s = String(v).trim().toLowerCase();
-  return s === "1" || s === "true" || s === "yes";
 }
 
 /* -------------------- ✅ UI Error Banner (بديل alert) -------------------- */
@@ -343,13 +295,6 @@ function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
 
     err.hidden = true;
     inp.value = "";
-
-    // ✅ تحديث عنوان/وصف المودال حسب العملية (حذف / استرجاع / إلخ)
-    const h3 = modal.querySelector("h3");
-    const lbl = modal.querySelector("label");
-    if(h3) h3.textContent = `تأكيد ${actionText}`;
-    if(lbl) lbl.textContent = `أدخل PIN (${PIN_CODE}) لإتمام ${actionText}`;
-
     modal.hidden = false;
 
     const cleanup = ()=>{
@@ -630,7 +575,7 @@ class HybridStore {
       const payments = (all.payments || []).map(p => ({
         ...p,
         flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
-      })).filter(p => !isRowDeleted(p));
+      }));
       await this.local.setAll(all.entries || [], payments, all.trash || []);
       return { entries: all.entries || [], payments, trash: all.trash || [] };
 
@@ -794,30 +739,6 @@ async function renderFromState(){
 
   const reportsPage = document.getElementById("page-reports");
   if(reportsPage && !reportsPage.hidden) renderReports();
-}
-
-async function renderFromStatePartial(flags = {}){
-  const entriesChanged = !!flags.entriesChanged;
-  const paymentsChanged = !!flags.paymentsChanged;
-  const trashChanged = !!flags.trashChanged;
-
-  // KPIs تعتمد على entries + payments
-  if(entriesChanged || paymentsChanged){
-    const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
-    renderKPIs(entriesView, STATE.payments);
-
-    // جدول العمليات يعتمد على الاتنين
-    await renderEntriesTable(applyEntryFilters(entriesView));
-
-    // جدول المدفوعات يعتمد على الاتنين (مرجع/party/ref)
-    await renderPaymentsTable(STATE.payments, STATE.entries);
-  }
-
-  const trashPage = document.getElementById("page-trash");
-  if(trashChanged && trashPage && !trashPage.hidden) renderTrash();
-
-  const reportsPage = document.getElementById("page-reports");
-  if((entriesChanged || paymentsChanged) && reportsPage && !reportsPage.hidden) renderReports();
 }
 
 /* -------------------- Render KPIs -------------------- */
@@ -1323,7 +1244,6 @@ function openLedgerPreview(){
   showPage("ledgerPreview");
 }
 
-
 /* -------------------- Trash Page -------------------- */
 function renderTrash(){
   const tbody = el("trashTbody");
@@ -1378,9 +1298,7 @@ function renderTrash(){
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
       <td>
-        <div class="rowActions">
-          <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
-        </div>
+        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1548,111 +1466,6 @@ function renderReports(){
 }
 
 
-
-/* -------------------- ✅ Store Mode Badge (Local / Sheets) -------------------- */
-let __storeStatus = { mode: null, note: "" };
-
-function ensureStoreBadge(){
-  if(document.getElementById("storeModeBadge")) return;
-
-  const b = document.createElement("div");
-  b.id = "storeModeBadge";
-
-  // ✅ base style (will be positioned safely by positionStoreBadge)
-  b.style.position = "fixed";
-  b.style.top = "10px";
-  b.style.left = "10px";
-  b.style.zIndex = "9998";
-  b.style.padding = "6px 10px";
-  b.style.borderRadius = "999px";
-  b.style.fontSize = "12px";
-  b.style.fontWeight = "800";
-  b.style.background = "rgba(0,0,0,.35)";
-  b.style.border = "1px solid rgba(255,255,255,.12)";
-  b.style.backdropFilter = "blur(6px)";
-  b.style.userSelect = "none";
-  b.style.cursor = "help";
-  b.style.maxWidth = "70vw";
-  b.style.whiteSpace = "nowrap";
-  b.style.overflow = "hidden";
-  b.style.textOverflow = "ellipsis";
-
-  b.textContent = "● …";
-  document.body.appendChild(b);
-
-  // لا نستخدم alert — فقط title
-  b.addEventListener("click", ()=>{});
-
-  // position now + on resize/orientation
-  positionStoreBadge();
-  window.addEventListener("resize", positionStoreBadge, { passive:true });
-  window.addEventListener("orientationchange", positionStoreBadge, { passive:true });
-}
-
-function positionStoreBadge(){
-  const b = document.getElementById("storeModeBadge");
-  if(!b) return;
-
-  // ✅ default (top-left)
-  b.style.top = "10px";
-  b.style.left = "10px";
-  b.style.right = "auto";
-
-  // ✅ if RTL UI & better spacing, keep it on the far edge away from actions when possible
-  const isSmall = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
-
-  // Try to avoid overlap with Logout button
-  const logout = document.getElementById("btnLogout");
-  if(logout){
-    const r1 = b.getBoundingClientRect();
-    const r2 = logout.getBoundingClientRect();
-    const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
-
-    if(overlap){
-      // Move badge below Logout button
-      const top = Math.round(r2.bottom + 8);
-      b.style.top = top + "px";
-      b.style.left = "10px";
-      b.style.right = "auto";
-    }
-  }
-
-  // ✅ On very small screens: prefer placing it to the far right (away from left actions)
-  if(isSmall){
-    // If there is an info button on the right, keep some margin
-    b.style.left = "auto";
-    b.style.right = "10px";
-
-    // Re-check overlap with logout when moved
-    const logout2 = document.getElementById("btnLogout");
-    if(logout2){
-      const r1 = b.getBoundingClientRect();
-      const r2 = logout2.getBoundingClientRect();
-      const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
-      if(overlap){
-        const top = Math.round(r2.bottom + 8);
-        b.style.top = top + "px";
-        b.style.left = "auto";
-        b.style.right = "10px";
-      }
-    }
-  }
-}
-
-function setStoreStatus(mode, note = ""){
-  __storeStatus.mode = mode;
-  __storeStatus.note = note || "";
-  const b = document.getElementById("storeModeBadge");
-  if(!b) return;
-
-  const label = (mode === "sheets") ? "Sheets" : "Local";
-  b.textContent = `● ${label}`;
-  b.title = mode === "sheets"
-    ? "المصدر: Google Sheets (متصل)"
-    : ("المصدر: LocalStorage (Offline/تعذر الشيت)" + (__storeStatus.note ? `\nالسبب: ${__storeStatus.note}` : ""));
-}
-/* --------------------------------------------------------------------------- */
-
 /* -------------------- Loading State (خفيف) -------------------- */
 function setLoading(isLoading){
   document.documentElement.classList.toggle("isLoading", !!isLoading);
@@ -1690,20 +1503,6 @@ function fingerprintState(entries, payments, trash){
   ].join("|");
 }
 
-function fingerprintSlice(arr){
-  const a = Array.isArray(arr) ? arr : [];
-  const len = a.length;
-  let maxT = 0;
-  let lastId = "";
-  for(const x of a){
-    const t = Number(x?.createdAt || x?.at || 0);
-    if(Number.isFinite(t) && t > maxT) maxT = t;
-    if(!lastId && x?.id) lastId = String(x.id);
-  }
-  return `${len}|${maxT}|${lastId}`;
-}
-
-
 async function refresh(forceNetwork = false){
   if(__refreshLock) return;
   __refreshLock = true;
@@ -1713,36 +1512,26 @@ async function refresh(forceNetwork = false){
     setLoading(true);
     showOverlay("جارِ تحديث البيانات…");
 
-    // ✅ Badge
-    ensureStoreBadge();
-    setStoreStatus(STORE.mode, "");
-
-    // ✅ اعرض المحلي الأول دائمًا (يمنع اختفاء الأرقام بعد Refresh)
+    // ✅ دايمًا اعرض المحلي الأول (يمنع اختفاء الأرقام بعد Refresh)
     const local = await STORE.local.getAll();
-    STATE.entries  = Array.isArray(local.entries) ? local.entries : [];
+    STATE.entries = Array.isArray(local.entries) ? local.entries : [];
     STATE.payments = Array.isArray(local.payments) ? local.payments : [];
-    STATE.trash    = normalizeTrash(Array.isArray(local.trash) ? local.trash : []);
+    STATE.trash = Array.isArray(local.trash) ? local.trash : [];
 
-    // ✅ تطبيع التواريخ + تدفقات المدفوعات
-    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
-    STATE.payments = (STATE.payments || []).map(p => ({
-      ...p,
-      date: normalizeISODate(p.date),
-      flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
-    })).filter(p => !isRowDeleted(p));
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
 
     await renderFromState();
 
     // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
     if(!forceNetwork){
+      hideOverlay();
+      setLoading(false);
       return;
     }
 
-    const before = {
-      entries: fingerprintSlice(STATE.entries),
-      payments: fingerprintSlice(STATE.payments),
-      trash: fingerprintSlice(STATE.trash)
-    };
+    const beforeFp = fingerprintState(STATE.entries, STATE.payments, STATE.trash);
 
     const all = await STORE.getAll();
 
@@ -1751,40 +1540,20 @@ async function refresh(forceNetwork = false){
       flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
     }));
 
-    STATE.entries  = Array.isArray(all.entries) ? all.entries : [];
+    STATE.entries = Array.isArray(all.entries) ? all.entries : [];
     STATE.payments = payments;
-    STATE.trash    = normalizeTrash(Array.isArray(all.trash) ? all.trash : []);
+    STATE.trash = Array.isArray(all.trash) ? all.trash : [];
 
-    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
-    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)})).filter(p => !isRowDeleted(p));
+    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
+    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
 
-    // ✅ Update badge
-    setStoreStatus(STORE.mode, "");
 
-    const after = {
-      entries: fingerprintSlice(STATE.entries),
-      payments: fingerprintSlice(STATE.payments),
-      trash: fingerprintSlice(STATE.trash)
-    };
-
-    const entriesChanged  = before.entries  !== after.entries;
-    const paymentsChanged = before.payments !== after.payments;
-    const trashChanged    = before.trash    !== after.trash;
-
-    // ✅ Diff-based: لو مفيش تغيير، لا تعيد الرندر
-    if(!(entriesChanged || paymentsChanged || trashChanged)){
-      return;
-    }
-
-    // ✅ Partial render حسب التغيير
-    await renderFromStatePartial({ entriesChanged, paymentsChanged, trashChanged });
+    await renderFromState();
     hideGlobalError();
 
   }catch(e){
     console.error(e);
-    // ✅ Update badge to local with note
-    setStoreStatus("local", String(e?.message || e || "").slice(0, 120));
-
     const msg =
       (STORE.mode === "local")
         ? "تعذر تحميل البيانات من الشيت. جاري استخدام التخزين المحلي مؤقتًا."
@@ -1797,15 +1566,11 @@ async function refresh(forceNetwork = false){
   }
 }
 
-
 /* -------------------- DOM Events -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   try{
     ensureGlobalBanner();
     setupPinGate();
-
-    ensureStoreBadge();
-    setStoreStatus(STORE.mode, "");
 
     if(isAuthed()){
       document.documentElement.classList.add("authed");
@@ -1814,7 +1579,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       try{ await STORE.init(); }
       catch(e){
         console.error(e);
-        setStoreStatus("local", "تعذر التهيئة");
         showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
       }
 
@@ -2036,17 +1800,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
-
-      const delId = btn.dataset.trashdel;
-      if(!delId) return;
+      const logId = btn.dataset.trashdel;
+      if(!logId) return;
 
       const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
       if(!okPin) return;
 
       if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
         try{
-          await STORE.deleteTrashLog(delId);
-          STATE.trash = normalizeTrash(await STORE.getTrash());
+          await STORE.deleteTrashLog(logId);
+          STATE.trash = await STORE.getTrash();
           renderTrash();
         }catch(e){
           console.error(e);
@@ -2054,7 +1817,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     });
-
 
   }catch(e){
     console.error(e);
