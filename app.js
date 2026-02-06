@@ -13,10 +13,21 @@
 
 const LS_KEY   = "oy_ledger_v3";
 const PIN_CODE = "1234";
+
+// ✅ تجهيز مستقبلي: نجاح تسجيل دخول جوجل (سيتم ربطه لاحقًا بـ Apps Script Allowlist)
+function onGoogleLoginSuccess(email){
+  try{
+    const e = String(email || "").trim().toLowerCase();
+    if(!e) return;
+    // لاحقًا: إرسال الإيميل للسيرفر + التحقق من الـ Allowlist
+    console.info("Google login (placeholder):", e);
+  }catch(_e){}
+}
+
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbx24eOde-hcX2Kk-Da6NnTdZSKrcDxrCItFczmSJdA_4QkBQgfd8BJUVwLyARtWJ6dR2w/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
   pin: "1234"
 };
 
@@ -79,6 +90,56 @@ function escapeHtml(str){
     .replaceAll("'", "&#039;");
 }
 
+/* -------------------- ✅ Trash Normalizer (Sheets/Local compatible) -------------------- */
+function normalizeTrashItem(it){
+  if(!it || typeof it !== "object") return null;
+
+  let obj = { ...it };
+
+  // snapshotJson (string) -> parsed object fields
+  const snapStr = obj.snapshotJson || obj.snapshotJSON || obj.snapshot;
+  if(typeof snapStr === "string" && snapStr.trim()){
+    try{
+      const parsed = JSON.parse(snapStr);
+      if(parsed && typeof parsed === "object"){
+        obj = { ...obj, ...parsed };
+      }
+    }catch(_e){}
+  }
+
+  // at: UI expects item.at; Sheets may send deletedAt
+  let at = obj.at ?? obj.deletedAt ?? obj.deleted_at ?? obj.time ?? obj.ts ?? obj.createdAt;
+  if(typeof at === "string" && /^\d+$/.test(at)) at = Number(at);
+  if(!Number.isFinite(Number(at))) at = Date.now();
+  obj.at = Number(at);
+
+  // type: UI expects delete_entry / delete_payment
+  if(!obj.type){
+    const reason = String(obj.reason || "").toLowerCase();
+    const refTbl = String(obj.refTable || "").toLowerCase();
+    if(reason.includes("entry") || reason.includes("transaction") || refTbl.includes("entries") || refTbl.includes("transactions")){
+      obj.type = "delete_entry";
+    }else if(reason.includes("payment") || refTbl.includes("payments")){
+      obj.type = "delete_payment";
+    }else{
+      // fallback
+      obj.type = (obj.entrySnapshot || obj.paymentsSnapshot) ? "delete_entry" : "delete_payment";
+    }
+  }
+
+  // id fallback
+  if(!obj.id) obj.id = obj.logId || obj.refId || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+  return obj;
+}
+function normalizeTrash(list){
+  return (Array.isArray(list) ? list : [])
+    .map(normalizeTrashItem)
+    .filter(Boolean);
+}
+/* ------------------------------------------------------------------------------ */
+
+
 /* ✅ Labels */
 function flowLabel(flow){
   return flow === "in" ? "متحصلات داخلة" : "مدفوعات خارجة";
@@ -90,6 +151,15 @@ function sumPaymentsForEntry(entryId, payments, flow = "all"){
     .filter(p => p.entryId === entryId)
     .filter(p => flow === "all" ? true : (p.flow === flow))
     .reduce((a,p)=> a + Number(p.amount || 0), 0);
+}
+
+/* ✅ استبعاد الصفوف المحذوفة القادمة من الشيت (isDeleted=1) */
+function isRowDeleted(obj){
+  if(!obj || typeof obj !== "object") return false;
+  const v = obj.isDeleted ?? obj.deleted ?? obj.is_deleted ?? obj.IsDeleted ?? obj.ISDELETED;
+  if(v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes";
 }
 
 /* -------------------- ✅ UI Error Banner (بديل alert) -------------------- */
@@ -284,6 +354,13 @@ function pinConfirmModalOpen(actionText = "تنفيذ العملية"){
 
     err.hidden = true;
     inp.value = "";
+
+    // ✅ تحديث عنوان/وصف المودال حسب العملية (حذف / استرجاع / إلخ)
+    const h3 = modal.querySelector("h3");
+    const lbl = modal.querySelector("label");
+    if(h3) h3.textContent = `تأكيد ${actionText}`;
+    if(lbl) lbl.textContent = `أدخل PIN (${PIN_CODE}) لإتمام ${actionText}`;
+
     modal.hidden = false;
 
     const cleanup = ()=>{
@@ -422,49 +499,22 @@ const API_ACTIONS = {
 async function apiCall(action, payload = {}){
   if(!API_CFG?.scriptUrl) throw new Error("NO_SCRIPT_URL");
 
-  // ✅ JSONP to bypass CORS on GitHub Pages
-  return new Promise((resolve, reject) => {
-    const cb = "__ax_cb_" + Math.random().toString(36).slice(2);
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("API_TIMEOUT"));
-    }, 15000);
+  const url = API_CFG.scriptUrl;
+  const pin = String(API_CFG.pin || PIN_CODE);
 
-    function cleanup(){
-      clearTimeout(timer);
-      try{ delete window[cb]; }catch(_e){ window[cb] = undefined; }
-      if(script && script.parentNode) script.parentNode.removeChild(script);
-    }
+  const qs = new URLSearchParams();
+  qs.set("action", action);
+  qs.set("pin", pin);
+  qs.set("payload", JSON.stringify(payload));
+  qs.set("_ts", String(Date.now())); // cache-buster
 
-    window[cb] = (data) => {
-      cleanup();
-      // Apps Script returns {ok:false,error:...} for errors
-      if(!data || data.ok === false){
-        const err = (data && (data.error || data.details)) ? String(data.error || data.details) : "API_ERROR";
-        reject(new Error(err));
-        return;
-      }
-      resolve(data);
-    };
+  const full = `${url}?${qs.toString()}`;
 
-    const qs = new URLSearchParams();
-    qs.set("pin", String(API_CFG.pin || ""));
-    qs.set("action", String(action || ""));
-    qs.set("payload", JSON.stringify(payload || {}));
-    qs.set("callback", cb);
-
-    const src = API_CFG.scriptUrl + (API_CFG.scriptUrl.includes("?") ? "&" : "?") + qs.toString();
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("API_LOAD_FAILED"));
-    };
-    document.head.appendChild(script);
-  });
+  const r = await fetch(full, { method:"GET", mode:"cors" });
+  const j = await r.json();
+  if(!j || j.ok === false) throw new Error(j?.error || "API_ERROR");
+  return j;
 }
-
 
 class LocalStore {
   async init(){ return true; }
@@ -591,7 +641,7 @@ class HybridStore {
       const payments = (all.payments || []).map(p => ({
         ...p,
         flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
-      }));
+      })).filter(p => !isRowDeleted(p));
       await this.local.setAll(all.entries || [], payments, all.trash || []);
       return { entries: all.entries || [], payments, trash: all.trash || [] };
 
@@ -755,6 +805,30 @@ async function renderFromState(){
 
   const reportsPage = document.getElementById("page-reports");
   if(reportsPage && !reportsPage.hidden) renderReports();
+}
+
+async function renderFromStatePartial(flags = {}){
+  const entriesChanged = !!flags.entriesChanged;
+  const paymentsChanged = !!flags.paymentsChanged;
+  const trashChanged = !!flags.trashChanged;
+
+  // KPIs تعتمد على entries + payments
+  if(entriesChanged || paymentsChanged){
+    const entriesView = STATE.entries.map(e => computeEntryView(e, STATE.payments));
+    renderKPIs(entriesView, STATE.payments);
+
+    // جدول العمليات يعتمد على الاتنين
+    await renderEntriesTable(applyEntryFilters(entriesView));
+
+    // جدول المدفوعات يعتمد على الاتنين (مرجع/party/ref)
+    await renderPaymentsTable(STATE.payments, STATE.entries);
+  }
+
+  const trashPage = document.getElementById("page-trash");
+  if(trashChanged && trashPage && !trashPage.hidden) renderTrash();
+
+  const reportsPage = document.getElementById("page-reports");
+  if((entriesChanged || paymentsChanged) && reportsPage && !reportsPage.hidden) renderReports();
 }
 
 /* -------------------- Render KPIs -------------------- */
@@ -1260,6 +1334,65 @@ function openLedgerPreview(){
   showPage("ledgerPreview");
 }
 
+
+async function restoreTrashLogById(logId){
+  const logRaw = (Array.isArray(STATE.trash) ? STATE.trash : []).find(x => String(x.id) === String(logId));
+  if(!logRaw) return;
+
+  const log = normalizeTrashItem(logRaw);
+  if(!log) return;
+
+  const okPin = await pinConfirmModalOpen("استرجاع من المحذوفات");
+  if(!okPin) return;
+
+  const kindLabel = (log.type === "delete_entry") ? "عملية" : "دفعة";
+  if(!confirm(`متأكد استرجاع ${kindLabel}؟\nبعد الاسترجاع سيتم حذف هذا السطر من سجل المحذوفات.`)){
+    return;
+  }
+
+  // Restore
+  if(log.type === "delete_entry"){
+    const entry = log.entrySnapshot || null;
+    const pays  = Array.isArray(log.paymentsSnapshot) ? log.paymentsSnapshot : [];
+
+    if(entry && entry.id){
+      const exists = STATE.entries.some(e => e.id === entry.id);
+      if(!exists){
+        try{ await STORE.addEntry(entry); }
+        catch(e){ console.error(e); showGlobalError("تعذر استرجاع العملية على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
+      }
+
+      // Restore payments (skip duplicates)
+      for(const p of pays){
+        if(!p || !p.id) continue;
+        const payExists = STATE.payments.some(x => x.id === p.id);
+        if(payExists) continue;
+        try{ await STORE.addPayment(p); }
+        catch(e){ console.error(e); showGlobalError("تعذر استرجاع بعض المدفوعات على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
+      }
+    }
+  }else{
+    const pay = log.paymentSnapshot || null;
+    if(pay && pay.id){
+      const payExists = STATE.payments.some(x => x.id === pay.id);
+      if(!payExists){
+        try{ await STORE.addPayment(pay); }
+        catch(e){ console.error(e); showGlobalError("تعذر استرجاع الدفعة على الشيت. تم الاسترجاع محليًا إذا كان الوضع Offline."); }
+      }
+    }
+  }
+
+  // Remove trash log after restore
+  try{
+    await STORE.deleteTrashLog(logId);
+  }catch(e){
+    console.error(e);
+    showGlobalError("تم الاسترجاع لكن تعذر حذف السطر من سجل المحذوفات على الشيت (قد يختفي محليًا فقط).");
+  }
+
+  await refresh(true);
+}
+
 /* -------------------- Trash Page -------------------- */
 function renderTrash(){
   const tbody = el("trashTbody");
@@ -1314,7 +1447,10 @@ function renderTrash(){
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
       <td>
-        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
+        <div class="rowActions">
+          <button class="btn small" data-trashrestore="${item.id}">استرجاع</button>
+          <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1482,6 +1618,111 @@ function renderReports(){
 }
 
 
+
+/* -------------------- ✅ Store Mode Badge (Local / Sheets) -------------------- */
+let __storeStatus = { mode: null, note: "" };
+
+function ensureStoreBadge(){
+  if(document.getElementById("storeModeBadge")) return;
+
+  const b = document.createElement("div");
+  b.id = "storeModeBadge";
+
+  // ✅ base style (will be positioned safely by positionStoreBadge)
+  b.style.position = "fixed";
+  b.style.top = "10px";
+  b.style.left = "10px";
+  b.style.zIndex = "9998";
+  b.style.padding = "6px 10px";
+  b.style.borderRadius = "999px";
+  b.style.fontSize = "12px";
+  b.style.fontWeight = "800";
+  b.style.background = "rgba(0,0,0,.35)";
+  b.style.border = "1px solid rgba(255,255,255,.12)";
+  b.style.backdropFilter = "blur(6px)";
+  b.style.userSelect = "none";
+  b.style.cursor = "help";
+  b.style.maxWidth = "70vw";
+  b.style.whiteSpace = "nowrap";
+  b.style.overflow = "hidden";
+  b.style.textOverflow = "ellipsis";
+
+  b.textContent = "● …";
+  document.body.appendChild(b);
+
+  // لا نستخدم alert — فقط title
+  b.addEventListener("click", ()=>{});
+
+  // position now + on resize/orientation
+  positionStoreBadge();
+  window.addEventListener("resize", positionStoreBadge, { passive:true });
+  window.addEventListener("orientationchange", positionStoreBadge, { passive:true });
+}
+
+function positionStoreBadge(){
+  const b = document.getElementById("storeModeBadge");
+  if(!b) return;
+
+  // ✅ default (top-left)
+  b.style.top = "10px";
+  b.style.left = "10px";
+  b.style.right = "auto";
+
+  // ✅ if RTL UI & better spacing, keep it on the far edge away from actions when possible
+  const isSmall = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
+
+  // Try to avoid overlap with Logout button
+  const logout = document.getElementById("btnLogout");
+  if(logout){
+    const r1 = b.getBoundingClientRect();
+    const r2 = logout.getBoundingClientRect();
+    const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
+
+    if(overlap){
+      // Move badge below Logout button
+      const top = Math.round(r2.bottom + 8);
+      b.style.top = top + "px";
+      b.style.left = "10px";
+      b.style.right = "auto";
+    }
+  }
+
+  // ✅ On very small screens: prefer placing it to the far right (away from left actions)
+  if(isSmall){
+    // If there is an info button on the right, keep some margin
+    b.style.left = "auto";
+    b.style.right = "10px";
+
+    // Re-check overlap with logout when moved
+    const logout2 = document.getElementById("btnLogout");
+    if(logout2){
+      const r1 = b.getBoundingClientRect();
+      const r2 = logout2.getBoundingClientRect();
+      const overlap = !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
+      if(overlap){
+        const top = Math.round(r2.bottom + 8);
+        b.style.top = top + "px";
+        b.style.left = "auto";
+        b.style.right = "10px";
+      }
+    }
+  }
+}
+
+function setStoreStatus(mode, note = ""){
+  __storeStatus.mode = mode;
+  __storeStatus.note = note || "";
+  const b = document.getElementById("storeModeBadge");
+  if(!b) return;
+
+  const label = (mode === "sheets") ? "Sheets" : "Local";
+  b.textContent = `● ${label}`;
+  b.title = mode === "sheets"
+    ? "المصدر: Google Sheets (متصل)"
+    : ("المصدر: LocalStorage (Offline/تعذر الشيت)" + (__storeStatus.note ? `\nالسبب: ${__storeStatus.note}` : ""));
+}
+/* --------------------------------------------------------------------------- */
+
 /* -------------------- Loading State (خفيف) -------------------- */
 function setLoading(isLoading){
   document.documentElement.classList.toggle("isLoading", !!isLoading);
@@ -1499,6 +1740,11 @@ function hideOverlay(){
   const ov = document.getElementById("loadingOverlay");
   if(!ov) return;
   ov.hidden = true;
+}
+
+/* ✅ ضمان إن الأوفرلاي ينتهي بعد آخر Render/Paint فعلي */
+function nextPaint(){
+  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
 }
 
 /* -------------------- Refresh (تحميل من الشيت) -------------------- */
@@ -1519,35 +1765,59 @@ function fingerprintState(entries, payments, trash){
   ].join("|");
 }
 
+function fingerprintSlice(arr){
+  const a = Array.isArray(arr) ? arr : [];
+  const len = a.length;
+  let maxT = 0;
+  let lastId = "";
+  for(const x of a){
+    const t = Number(x?.createdAt || x?.at || 0);
+    if(Number.isFinite(t) && t > maxT) maxT = t;
+    if(!lastId && x?.id) lastId = String(x.id);
+  }
+  return `${len}|${maxT}|${lastId}`;
+}
+
+
 async function refresh(forceNetwork = false){
   if(__refreshLock) return;
   __refreshLock = true;
 
   try{
-    hideGlobalError();
-    setLoading(true);
     showOverlay("جارِ تحديث البيانات…");
+    setLoading(true);
+    hideGlobalError();
 
-    // ✅ دايمًا اعرض المحلي الأول (يمنع اختفاء الأرقام بعد Refresh)
+    // ✅ Badge
+    ensureStoreBadge();
+    setStoreStatus(STORE.mode, "");
+
+    // ✅ اعرض المحلي الأول دائمًا (يمنع اختفاء الأرقام بعد Refresh)
     const local = await STORE.local.getAll();
-    STATE.entries = Array.isArray(local.entries) ? local.entries : [];
+    STATE.entries  = Array.isArray(local.entries) ? local.entries : [];
     STATE.payments = Array.isArray(local.payments) ? local.payments : [];
-    STATE.trash = Array.isArray(local.trash) ? local.trash : [];
+    STATE.trash    = normalizeTrash(Array.isArray(local.trash) ? local.trash : []);
 
-    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
-    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
-    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
+    // ✅ تطبيع التواريخ + تدفقات المدفوعات
+    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({
+      ...p,
+      date: normalizeISODate(p.date),
+      flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
+    })).filter(p => !isRowDeleted(p));
 
     await renderFromState();
 
     // ✅ لو مش مطلوب تحميل من الشيت، نكتفي بالمحلي
     if(!forceNetwork){
-      hideOverlay();
-      setLoading(false);
       return;
     }
 
-    const beforeFp = fingerprintState(STATE.entries, STATE.payments, STATE.trash);
+    const before = {
+      entries: fingerprintSlice(STATE.entries),
+      payments: fingerprintSlice(STATE.payments),
+      trash: fingerprintSlice(STATE.trash)
+    };
 
     const all = await STORE.getAll();
 
@@ -1556,37 +1826,70 @@ async function refresh(forceNetwork = false){
       flow: (p.flow === "in" || p.flow === "out") ? p.flow : "out"
     }));
 
-    STATE.entries = Array.isArray(all.entries) ? all.entries : [];
+    STATE.entries  = Array.isArray(all.entries) ? all.entries : [];
     STATE.payments = payments;
-    STATE.trash = Array.isArray(all.trash) ? all.trash : [];
+    STATE.trash    = normalizeTrash(Array.isArray(all.trash) ? all.trash : []);
 
-    // ✅ تطبيع التواريخ عشان الفلاتر/التقارير تشتغل صح
-    STATE.entries = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
-    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)}));
+    STATE.entries  = (STATE.entries || []).map(e => ({...e, date: normalizeISODate(e.date)}));
+    STATE.payments = (STATE.payments || []).map(p => ({...p, date: normalizeISODate(p.date)})).filter(p => !isRowDeleted(p));
 
+    // ✅ Update badge
+    setStoreStatus(STORE.mode, "");
 
-    await renderFromState();
+    const after = {
+      entries: fingerprintSlice(STATE.entries),
+      payments: fingerprintSlice(STATE.payments),
+      trash: fingerprintSlice(STATE.trash)
+    };
+
+    const entriesChanged  = before.entries  !== after.entries;
+    const paymentsChanged = before.payments !== after.payments;
+    const trashChanged    = before.trash    !== after.trash;
+
+    // ✅ Diff-based: لو مفيش تغيير، لا تعيد الرندر
+    if(!(entriesChanged || paymentsChanged || trashChanged)){
+      return;
+    }
+
+    // ✅ Partial render حسب التغيير
+    await renderFromStatePartial({ entriesChanged, paymentsChanged, trashChanged });
     hideGlobalError();
 
   }catch(e){
     console.error(e);
+    // ✅ Update badge to local with note
+    const note = String(e?.message || e || "").slice(0, 120);
+    setStoreStatus("local", note);
+    try{
+      const k = "__oy_offline_notice_shown";
+      if(!sessionStorage.getItem(k)){
+        sessionStorage.setItem(k, "1");
+        showGlobalError("⚠️ تعذر الاتصال بالشيت. سيتم استخدام التخزين المحلي مؤقتًا حتى يعود الاتصال.");
+      }
+    }catch(_e){}
+
     const msg =
       (STORE.mode === "local")
         ? "تعذر تحميل البيانات من الشيت. جاري استخدام التخزين المحلي مؤقتًا."
         : "حصلت مشكلة في تحميل البيانات. تأكد إن Web App شغال وبعدين اضغط إعادة المحاولة.";
     showGlobalError(msg);
   }finally{
+    await nextPaint();
     hideOverlay();
     setLoading(false);
     __refreshLock = false;
   }
 }
 
+
 /* -------------------- DOM Events -------------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   try{
     ensureGlobalBanner();
     setupPinGate();
+
+    ensureStoreBadge();
+    setStoreStatus(STORE.mode, "");
 
     if(isAuthed()){
       document.documentElement.classList.add("authed");
@@ -1595,6 +1898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       try{ await STORE.init(); }
       catch(e){
         console.error(e);
+        setStoreStatus("local", "تعذر التهيئة");
         showGlobalError("تعذر تهيئة التخزين على الشيت. سيتم استخدام التخزين المحلي مؤقتًا.");
       }
 
@@ -1816,16 +2120,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
-      const logId = btn.dataset.trashdel;
-      if(!logId) return;
+
+      const restoreId = btn.dataset.trashrestore;
+      if(restoreId){
+        await restoreTrashLogById(restoreId);
+        return;
+      }
+
+      const delId = btn.dataset.trashdel;
+      if(!delId) return;
 
       const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
       if(!okPin) return;
 
       if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
         try{
-          await STORE.deleteTrashLog(logId);
-          STATE.trash = await STORE.getTrash();
+          await STORE.deleteTrashLog(delId);
+          STATE.trash = normalizeTrash(await STORE.getTrash());
           renderTrash();
         }catch(e){
           console.error(e);
@@ -1833,6 +2144,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     });
+
 
   }catch(e){
     console.error(e);

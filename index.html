@@ -10,7 +10,7 @@
   <script>
     window.AXENTRO_API = {
       // ✅ ده اللينك اللي فتح معاك JSON من /exec
-      scriptUrl: "https://script.google.com/macros/s/AKfycbx24eOde-hcX2Kk-Da6NnTdZSKrcDxrCItFczmSJdA_4QkBQgfd8BJUVwLyARtWJ6dR2w/exec",
+      scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
       pin: "1234"
     };
   </script>
@@ -40,6 +40,16 @@
             </div>
 
             <div class="help">التعليمات: اكتب الرقم السري ثم اضغط “دخول”.</div>
+
+            <div class="orDivider"><span>أو</span></div>
+
+            <!-- ✅ Google Sign-In (قريبًا) -->
+            <button id="googleLoginBtn" class="btnPin googleBtn" type="button" aria-label="تسجيل دخول بجوجل">
+              تسجيل دخول بجوجل (قريبًا)
+            </button>
+            <div id="googleLoginHint" class="help">
+              سيتم تفعيل تسجيل الدخول بجوجل بعد إعداد نظام السماح (Allowlist). حاليًا هذا الزر للتجهيز فقط.
+            </div>
 
             <button class="btnPin" type="submit">دخول</button>
             <div id="pinError" class="error" hidden>PIN غير صحيح.</div>
@@ -628,6 +638,18 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  
+  <script>
+    // ✅ Google Login button (placeholder)
+    document.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById("googleLoginBtn");
+      if(!btn) return;
+      btn.addEventListener("click", () => {
+        alert("قريبًا: سيتم تفعيل تسجيل الدخول بجوجل بعد إعداد الـ Apps Script الجديد والـ Allowlist.");
+      });
+    });
+  </script>
+
+<script src="app.js"></script>
 </body>
 </html>
