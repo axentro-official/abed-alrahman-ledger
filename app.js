@@ -16,7 +16,7 @@ const PIN_CODE = "1234";
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbyrekHgMhE1XIVv72XNS4C1WScMR4suihK74RoA7OHsmtBw2eNaGtoUGx7NkysF7YzU7g/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbx24eOde-hcX2Kk-Da6NnTdZSKrcDxrCItFczmSJdA_4QkBQgfd8BJUVwLyARtWJ6dR2w/exec",
   pin: "1234"
 };
 
@@ -410,19 +410,10 @@ const API_CFG = (window.AXENTRO_API && typeof window.AXENTRO_API === "object")
 const API_ACTIONS = {
   init: "init",
   getAll: "getAll",
-
   addEntry: "addEntry",
   addPayment: "addPayment",
-
   deleteEntry: "deleteEntry",
   deletePayment: "deletePayment",
-
-  // ✅ Restore / Purge (Sheets)
-  restoreEntryCascade: "restoreEntryCascade",
-  restorePayment: "restorePayment",
-  purgeEntry: "purgeEntry",
-  purgePayment: "purgePayment",
-
   getTrash: "getTrash",
   deleteTrashLog: "deleteTrashLog"
 };
@@ -431,22 +422,49 @@ const API_ACTIONS = {
 async function apiCall(action, payload = {}){
   if(!API_CFG?.scriptUrl) throw new Error("NO_SCRIPT_URL");
 
-  const url = API_CFG.scriptUrl;
-  const pin = String(API_CFG.pin || PIN_CODE);
+  // ✅ JSONP to bypass CORS on GitHub Pages
+  return new Promise((resolve, reject) => {
+    const cb = "__ax_cb_" + Math.random().toString(36).slice(2);
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("API_TIMEOUT"));
+    }, 15000);
 
-  const qs = new URLSearchParams();
-  qs.set("action", action);
-  qs.set("pin", pin);
-  qs.set("payload", JSON.stringify(payload));
-  qs.set("_ts", String(Date.now())); // cache-buster
+    function cleanup(){
+      clearTimeout(timer);
+      try{ delete window[cb]; }catch(_e){ window[cb] = undefined; }
+      if(script && script.parentNode) script.parentNode.removeChild(script);
+    }
 
-  const full = `${url}?${qs.toString()}`;
+    window[cb] = (data) => {
+      cleanup();
+      // Apps Script returns {ok:false,error:...} for errors
+      if(!data || data.ok === false){
+        const err = (data && (data.error || data.details)) ? String(data.error || data.details) : "API_ERROR";
+        reject(new Error(err));
+        return;
+      }
+      resolve(data);
+    };
 
-  const r = await fetch(full, { method:"GET", mode:"cors" });
-  const j = await r.json();
-  if(!j || j.ok === false) throw new Error(j?.error || "API_ERROR");
-  return j;
+    const qs = new URLSearchParams();
+    qs.set("pin", String(API_CFG.pin || ""));
+    qs.set("action", String(action || ""));
+    qs.set("payload", JSON.stringify(payload || {}));
+    qs.set("callback", cb);
+
+    const src = API_CFG.scriptUrl + (API_CFG.scriptUrl.includes("?") ? "&" : "?") + qs.toString();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("API_LOAD_FAILED"));
+    };
+    document.head.appendChild(script);
+  });
 }
+
 
 class LocalStore {
   async init(){ return true; }
@@ -509,11 +527,6 @@ class LocalStore {
     return all.trash || [];
   }
   async deleteTrashLog(logId){
-
-  async restoreEntryCascade(entryId){ await apiCall(API_ACTIONS.restoreEntryCascade, { entryId }); }
-  async restorePayment(payId){ await apiCall(API_ACTIONS.restorePayment, { payId }); }
-  async purgeEntry(entryId){ await apiCall(API_ACTIONS.purgeEntry, { entryId }); }
-  async purgePayment(payId){ await apiCall(API_ACTIONS.purgePayment, { payId }); }
     const rawT = localStorage.getItem(TRASH_KEY);
     const t = rawT ? JSON.parse(rawT) : { logs: [] };
     t.logs = (t.logs || []).filter(x => x.id !== logId);
@@ -655,11 +668,6 @@ class HybridStore {
   }
 
   async deleteTrashLog(logId){
-
-  async restoreEntryCascade(entryId){ if(this.mode==="local") return; await this.sheets.restoreEntryCascade(entryId); }
-  async restorePayment(payId){ if(this.mode==="local") return; await this.sheets.restorePayment(payId); }
-  async purgeEntry(entryId){ if(this.mode==="local") return; await this.sheets.purgeEntry(entryId); }
-  async purgePayment(payId){ if(this.mode==="local") return; await this.sheets.purgePayment(payId); }
     if(this.mode === "local"){
       return await this.local.deleteTrashLog(logId);
     }
@@ -1306,10 +1314,7 @@ function renderTrash(){
       <td class="num">${escapeHtml(amount)}</td>
       <td>${escapeHtml(note)}</td>
       <td>
-        <div class="rowActions">
-          <button class="btn small" data-trashrestore="${item.id}">استرجاع</button>
-          <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
-        </div>
+        <button class="btn small danger" data-trashdel="${item.id}">حذف نهائي</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -1807,70 +1812,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    // Trash restore / purge
+    // Trash delete forever
     el("trashTbody")?.addEventListener("click", async (ev)=>{
       const btn = ev.target.closest("button");
       if(!btn) return;
+      const logId = btn.dataset.trashdel;
+      if(!logId) return;
 
-      const restoreId = btn.dataset.trashrestore;
-      const purgeId = btn.dataset.trashdel;
-
-      if(restoreId){
-        const okPin = await pinConfirmModalOpen("استرجاع من المحذوفات");
-        if(!okPin) return;
-
-        const log = (STATE.trash||[]).find(x=>String(x.id)===String(restoreId));
-        if(!log) return;
-
-        const table = String(log.refTable||"");
-        const refId = String(log.refId||"");
-
-        try{
-          if(table === "Transactions"){
-            await STORE.restoreEntryCascade(refId);
-          }else{
-            await STORE.restorePayment(refId);
-          }
-          // تنظيف محلي: السطر يختفي فورًا
-          try{ await STORE.deleteTrashLog(restoreId); }catch(_e){}
-          STATE.trash = await STORE.getTrash();
-          renderTrash();
-          await refresh(true);
-        }catch(e){
-          console.error(e);
-          showGlobalError("تعذر الاسترجاع على الشيت. تأكد أن WebApp محدث ومُعاد نشره.");
-        }
-        return;
-      }
-
-      if(!purgeId) return;
-
-      const okPin = await pinConfirmModalOpen("الحذف النهائي");
+      const okPin = await pinConfirmModalOpen("الحذف النهائي من سجل المحذوفات");
       if(!okPin) return;
 
-      if(!confirm("متأكد حذف نهائي؟ سيتم حذف السجل نهائيًا من الشيت ولن يمكن استرجاعه.")) return;
-
-      const log = (STATE.trash||[]).find(x=>String(x.id)===String(purgeId));
-      if(!log) return;
-
-      const table = String(log.refTable||"");
-      const refId = String(log.refId||"");
-
-      try{
-        if(table === "Transactions"){
-          await STORE.purgeEntry(refId);
-        }else{
-          await STORE.purgePayment(refId);
+      if(confirm("متأكد حذف نهائي؟ لن يمكن استرجاع هذا السطر.")){
+        try{
+          await STORE.deleteTrashLog(logId);
+          STATE.trash = await STORE.getTrash();
+          renderTrash();
+        }catch(e){
+          console.error(e);
+          showGlobalError("تعذر حذف السطر من الشيت. تم الحذف محليًا إذا كان الوضع Offline.");
         }
-        // تحديث
-        STATE.trash = await STORE.getTrash();
-        renderTrash();
-        await refresh(true);
-      }catch(e){
-        console.error(e);
-        showGlobalError("تعذر الحذف النهائي على الشيت. تأكد أن Apps Script يدعم purgeEntry/purgePayment ثم أعد النشر.");
       }
-    });}catch(e){
+    });
+
+  }catch(e){
     console.error(e);
     showGlobalError("فيه خطأ حصل في تشغيل الصفحة. جرّب تحديث الصفحة أو امسح كاش الموقع.");
   }
