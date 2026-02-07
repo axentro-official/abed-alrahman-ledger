@@ -27,7 +27,7 @@ function onGoogleLoginSuccess(email){
 const AUTH_KEY = "oy_auth_v1";
 
 window.AXENTRO_API = window.AXENTRO_API || {
-  scriptUrl: "https://script.google.com/macros/s/AKfycbylnp2EK_zTP4YxMcI04t9bmYMrR9BkQaC6pRXv1jgnIeqBDLk3EcslmiEZS7qMSt0/exec",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbxg-mnc60NWXnOQjI9VurtgTpkEiwnCyjnbP5afz74h-7X3sWQipJu2oKJfb5uIa0CO/exec",
   pin: "1234"
 };
 
